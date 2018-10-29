@@ -4,41 +4,46 @@
 #include "ip.h"
 #include "mac.h"
 
+const bool DEBUG = true;
+
 // TCL bindings
 static class BleMeshAdvAgentClass : public TclClass {
 public:
     BleMeshAdvAgentClass() : TclClass("Agent/BleMeshAdv") {}
-    TclObject* create(int, const char*const*) {
+    TclObject* create(int argc, const char*const* argv) {
         return (new BleMeshAdvAgent());
     }    
-} class_BleMeshAdvAgent;
+} class_blemshadv;
 
 
 BleMeshAdvAgent::BleMeshAdvAgent(): Agent(PT_MESSAGE) {
-    size_ = 46;
-    defttl_= 10;
-    jitterMax_us = 10000;
-    recvd_pkts_buffer_size = 100;
+    
 
-    recvd_pkts_buffer = new CircularContainer(recvd_pkts_buffer_size);
-
+    printf("Created new agent\n");
     bind("packetSize_", &size_);
     bind("jitterMax_us_", &jitterMax_us);
     bind("recv_pkt_buffer_size_", &recvd_pkts_buffer_size);
     bind("default_ttl_", &defttl_);
+
+    recvd_pkts_buffer = new CircularContainer(recvd_pkts_buffer_size);
 }
 
-int BleMeshAdvAgent::command(int argc, const char*const* argv) {
-    return (Agent::command(argc, argv));
-}
 
 void BleMeshAdvAgent::relaymsg(Packet* p) {
 
-    Packet* pkt = p->copy();
 
-    HDR_IP(pkt)->ttl_--;
+    Packet* pkt = p->copy(); // Copy the packet that is to be relayed so that we  send out a new one instead
+
+    HDR_IP(pkt)->ttl_--; // Decrement the ttl
     double jitter_us = Random::random() % jitterMax_us;
+
+    // Start a new timer for sending the packet later 
     SimpleJitterTimer* jitterTimer = new SimpleJitterTimer(this, pkt);
+
+    if(DEBUG) {
+        printf("Agent scheduling relay, uid = %u, jitter = %f",HDR_CMN(pkt)->uid(), jitter_us/1000);
+
+    }
     jitterTimer->start(jitter_us);
 }
 
@@ -53,10 +58,16 @@ void BleMeshAdvAgent::sendmsg(int uid, const char *flags){
     HDR_CMN(p)->uid() = uid;
     HDR_IP(p)->ttl() = defttl_;
     HDR_IP(p)->dst().addr_ = MAC_BROADCAST;
-    HDR_IP(p)->dst().port_ = 1;
+
+    // THIS PORT HAS TO BE FIXED
+    HDR_IP(p)->dst().port_ = 42;
 
     double jitter_us = Random::random() % jitterMax_us;
     SimpleJitterTimer* jitterTimer = new SimpleJitterTimer(this, p);
+    if(DEBUG) {
+        printf("Agent scheduling packet, %u, jitter = %f\n", HDR_CMN(p)->uid(),jitter_us/1000);
+        
+    }
     jitterTimer->start(jitter_us);
 
 }
@@ -67,6 +78,10 @@ void BleMeshAdvAgent::sendmsg(Packet* p) {
     // This is made so that the SimpleJitterTimer can call it after the jitter is over
     double local_time = Scheduler::instance().clock();
     HDR_CMN(p)->timestamp() = local_time;
+
+    if(DEBUG) {
+        printf("Agent passing packet downstream uid = %i\n", HDR_CMN(p)->uid());
+    }
     target_->recv(p);
 
 }
@@ -74,8 +89,15 @@ void BleMeshAdvAgent::sendmsg(Packet* p) {
 
 
 void BleMeshAdvAgent::recv(Packet* pkt, Handler*) {
+    if(DEBUG) {
+        printf("Agent received packet\n");
+        printf("%i\n",HDR_IP(pkt)->ttl());
+    }
 
-    if (recvd_pkts_buffer->find(HDR_CMN(pkt)->uid_) && HDR_IP(pkt)->ttl_ < 0) {
+    if (!recvd_pkts_buffer->find(HDR_CMN(pkt)->uid()) && HDR_IP(pkt)->ttl() > 0) {
+        if(DEBUG) {
+            printf("Agent: packet not received before\n");
+        }
         recvd_pkts_buffer->push(HDR_CMN(pkt)->uid_);
         relaymsg(pkt);
     }
@@ -86,11 +108,18 @@ void BleMeshAdvAgent::recv(Packet* pkt, Handler*) {
 
 }
 
-/*
+
 int BleMeshAdvAgent::command(int argc, const char*const* argv) {
-    return 
+    if (argc == 3) {
+        if (strcmp(argv[1], "send_adv") == 0) {
+            sendmsg(atoi(argv[2]),0);
+            return TCL_OK;
+        }
+    } 
+
+    return Agent::command(argc, argv);
 }
-*/
+
 
 // SimpleJitterTimer implementation
 

@@ -1,7 +1,9 @@
 #include "ll.h"
 #include "mac.h"
 #include "mac-simple-mesh.h"
-#include "mac-simple.h"
+#include "cmu-trace.h"
+
+const bool DEBUG = true;
 
 //Binding the c++ class til otcl
 static class MacSimpleMeshClass : public TclClass {
@@ -10,38 +12,36 @@ public:
     TclObject* create(int, const char*const*) {
         return new MacSimpleMesh();
     }
-} class_macsimplemesh
+} class_macsimplemesh;
 
 
 // Implementation of the MAC class
 MacSimpleMesh::MacSimpleMesh() : Mac() {
     rx_state_ = tx_state_ = MAC_IDLE;
     tx_active_ = 0;
-    waitTimer = new MacSimpleWaitTimer(this);
-    sendTimer = new MacSimpleSendTimer(this);
-    recvTimer = new MacSimpleRecvTimer(this);
+    waitTimer = new MacSimpleMeshWaitTimer(this);
+    sendTimer = new MacSimpleMeshSendTimer(this);
+    recvTimer = new MacSimpleMeshRecvTimer(this);
     busy_ = 0;
 }
 
-int MacSimpleMesh::command(int argc, const char*const* argv)
-{ //TODO: We should test so that the input is valid.
-	if (argc == 3) {
-		if(strcmp(argv[1], "maxjitter") == 0) {
-			max_jitter_ms = atof(argv[2])
-			return (TCL_OK);
-		}
-	}
-	return Mac::command(argc, argv);
-}
 
 void MacSimpleMesh::recv(Packet *p, Handler *h){
     /* Should be identical to MacSimple::recv() */
+
     struct hdr_cmn *hdr = HDR_CMN(p);
 	/* let MacSimple::send handle the outgoing packets */
 	if (hdr->direction() == hdr_cmn::DOWN) {
+		if(DEBUG) {
+			printf("MAC is sending packet uid = %u\n", hdr->uid());
+    	}
 		send(p,h);
 		return;
 	}
+
+	if(DEBUG) {
+		printf("MAC has received a packet uid = %u\n", hdr->uid());   
+    }
 
 	/* handle an incoming packet */
 
@@ -66,6 +66,11 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 		 * We aren't already receiving any packets, so go ahead
 		 * and try to receive this one.
 		 */
+
+		if(DEBUG) {
+			printf("MAC was idle\n");
+			
+    	}
 		rx_state_ = MAC_RECV;
 		pktRx_ = p;
 		/* schedule reception of the packet */
@@ -75,13 +80,23 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 		 * We are receiving a different packet, so decide whether
 		 * the new packet's power is high enough to notice it.
 		 */
+
+
 		if (pktRx_->txinfo_.RxPr / p->txinfo_.RxPr
 			>= p->txinfo_.CPThresh) {
-                   //     printf ("\n pktRx_->txinfo_.RxPr %f p->txinfo_.RxPr %f p->txinfo_.CPThresh %f ",pktRx_->txinfo_.RxPr,p->txinfo_.RxPr,p->txinfo_.CPThresh);
+
+				
+		           //     printf ("\n pktRx_->txinfo_.RxPr %f p->txinfo_.RxPr %f p->txinfo_.CPThresh %f ",pktRx_->txinfo_.RxPr,p->txinfo_.RxPr,p->txinfo_.CPThresh);
  
 			/* power too low, ignore the packet */
+			if(DEBUG) {
+				printf("MAC was busy, but no collision\n");
+    		}
 			Packet::free(p);
 		} else {
+			if(DEBUG) {
+				printf("MAC was busy collision!!\n");
+    		}
 			/* power is high enough to result in collision */
 			rx_state_ = MAC_COLL;
 
@@ -115,7 +130,7 @@ void MacSimpleMesh::send(Packet *p, Handler *h) {
     /* Confirm that we are idle */
     if (tx_state_ != MAC_IDLE) {
         // Delay packet transmission until after the current is done
-        printf("Packet send collision in MacSimpleMesh::send")
+        printf("Packet send collision in MacSimpleMesh::send");
         return;
     }
 
@@ -131,8 +146,8 @@ void MacSimpleMesh::send(Packet *p, Handler *h) {
 
     else {
         // Wait until we have received the current packet
-        waitTimer->restart(HDR_CMN(pkt_Rx_)->txtime());
-        sendTimer->restart(ch->txtime() + HDR_CMN(pkt_Rx_)->txtime());
+        waitTimer->restart(HDR_CMN(pktRx_)->txtime());
+        sendTimer->restart(ch->txtime() + HDR_CMN(pktRx_)->txtime());
     }
 
 }
@@ -148,14 +163,19 @@ double MacSimpleMesh::txtime(Packet *p) {
 
 
 void MacSimpleMesh::recvHandler() {
+
+
     hdr_cmn *ch = HDR_CMN(pktRx_);
     Packet* p = pktRx_;
     MacState state = rx_state_;
     pktRx_ = 0;
 
+	
+
     // Get the destination from the packet header
     int dst = hdr_dst((char*) HDR_MAC(p));
 
+	printf("Mac entered recvHandler uid = %u, dst = %i\n",ch->uid(), dst);
     rx_state_ = MAC_IDLE;
 
     if (tx_active_) {
@@ -170,6 +190,7 @@ void MacSimpleMesh::recvHandler() {
     }
 
     else if (dst != index_ && (u_int32_t)dst != MAC_BROADCAST) {
+		printf("MAC dropped package Due to wrong dst");
         Packet::free(p);
     }
 
@@ -179,6 +200,8 @@ void MacSimpleMesh::recvHandler() {
         drop(p, DROP_MAC_PACKET_ERROR);
     }
     else {
+		printf("Mac passed uid = %u to LL\n",ch->uid());
+
         // Pass packet to LL
         uptarget_->recv(p, (Handler*) 0); 
     }
@@ -205,4 +228,66 @@ void MacSimpleMesh::sendHandler() {
 	// I have to let the guy above me know I'm done with the packet
 	h->handle(p); // ERLING: Seems unneccesary
 
+}
+
+
+//  Timers
+
+void MacSimpleMeshTimer::restart(double time)
+{
+	if (busy_)
+		stop();
+	start(time);
+}
+
+	
+
+void MacSimpleMeshTimer::start(double time)
+{
+	Scheduler &s = Scheduler::instance();
+
+	assert(busy_ == 0);
+	
+	busy_ = 1;
+	stime = s.clock();
+	rtime = time;
+	assert(rtime >= 0.0);
+
+	s.schedule(this, &intr, rtime);
+}
+
+void MacSimpleMeshTimer::stop(void)
+{
+	Scheduler &s = Scheduler::instance();
+
+	assert(busy_);
+	s.cancel(&intr);
+	
+	busy_ = 0;
+	stime = rtime = 0.0;
+}
+
+
+void MacSimpleMeshWaitTimer::handle(Event *)
+{
+	busy_ = 0;
+	stime = rtime = 0.0;
+
+	mac->waitHandler();
+}
+
+void MacSimpleMeshSendTimer::handle(Event *)
+{
+	busy_ = 0;
+	stime = rtime = 0.0;
+
+	mac->sendHandler();
+}
+
+void MacSimpleMeshRecvTimer::handle(Event *)
+{
+	busy_ = 0;
+	stime = rtime = 0.0;
+
+	mac->recvHandler();
 }

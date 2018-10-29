@@ -13,15 +13,14 @@ public:
     BleMeshAdvAgent();
     void relaymsg(Packet* pkt);
     void sendmsg(int uid, const char *flags = 0);
-    int command(int, const char*const*);
     void sendmsg(Packet* p);
     void recv(Packet* p, Handler*);
-    //int command(int argc, const char*const* argv);
+    int command(int argc, const char*const* argv);
 
 private:
-    long long jitterMax_us;
-    int recvd_pkts_buffer_size;
-    CircularContainer* recvd_pkts_buffer;
+    long long jitterMax_us; //Maximum jitter for the agent
+    int recvd_pkts_buffer_size; 
+    CircularContainer* recvd_pkts_buffer; //buffer where packet-ids of previously recived packets are stored
 };
 
 class SimpleJitterTimer: public Handler {
