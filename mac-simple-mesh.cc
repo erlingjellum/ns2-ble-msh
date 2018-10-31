@@ -32,16 +32,9 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
     struct hdr_cmn *hdr = HDR_CMN(p);
 	/* let MacSimple::send handle the outgoing packets */
 	if (hdr->direction() == hdr_cmn::DOWN) {
-		if(DEBUG) {
-			printf("MAC is sending packet uid = %u\n", hdr->uid());
-    	}
 		send(p,h);
 		return;
 	}
-
-	if(DEBUG) {
-		printf("MAC has received a packet uid = %u\n", hdr->uid());   
-    }
 
 	/* handle an incoming packet */
 
@@ -54,7 +47,6 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 	if (tx_active_)
 	{
 		hdr->error() = 1;
-
 	}
 
 	/*
@@ -67,10 +59,6 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 		 * and try to receive this one.
 		 */
 
-		if(DEBUG) {
-			printf("MAC was idle\n");
-			
-    	}
 		rx_state_ = MAC_RECV;
 		pktRx_ = p;
 		/* schedule reception of the packet */
@@ -90,13 +78,11 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
  
 			/* power too low, ignore the packet */
 			if(DEBUG) {
-				printf("MAC was busy, but no collision\n");
+				printf("MAC%s dropped incoming package_%u because it was already recv strong signal\n", name_, HDR_CMN(p)->uid());
     		}
 			Packet::free(p);
 		} else {
-			if(DEBUG) {
-				printf("MAC was busy collision!!\n");
-    		}
+	
 			/* power is high enough to result in collision */
 			rx_state_ = MAC_COLL;
 
@@ -130,7 +116,7 @@ void MacSimpleMesh::send(Packet *p, Handler *h) {
     /* Confirm that we are idle */
     if (tx_state_ != MAC_IDLE) {
         // Delay packet transmission until after the current is done
-        printf("Packet send collision in MacSimpleMesh::send");
+        printf("Packet send collision in MacSimpleMesh::send\n");
         return;
     }
 
@@ -140,12 +126,24 @@ void MacSimpleMesh::send(Packet *p, Handler *h) {
     
     if (rx_state_ == MAC_IDLE) {
         // We are idle and can send right away
+
+		if (DEBUG) {
+
+		double local_time = Scheduler::instance().clock();
+		printf("MAC was IDLE packet_%u to downtarget t=%f\n", HDR_CMN(pktTx_)->uid(),local_time);
+		}
+
         waitHandler();
         sendTimer->restart(ch->txtime());
     }
 
     else {
         // Wait until we have received the current packet
+			if (DEBUG) {
+
+		double local_time = Scheduler::instance().clock();
+		printf("MAC IS NOT IDLE packet_%u t=%f\n", HDR_CMN(pktTx_)->uid(),local_time);
+	}
         waitTimer->restart(HDR_CMN(pktRx_)->txtime());
         sendTimer->restart(ch->txtime() + HDR_CMN(pktRx_)->txtime());
     }
@@ -174,8 +172,6 @@ void MacSimpleMesh::recvHandler() {
 
     // Get the destination from the packet header
     int dst = hdr_dst((char*) HDR_MAC(p));
-
-	printf("Mac entered recvHandler uid = %u, dst = %i\n",ch->uid(), dst);
     rx_state_ = MAC_IDLE;
 
     if (tx_active_) {
@@ -186,22 +182,22 @@ void MacSimpleMesh::recvHandler() {
 
     else if (state == MAC_COLL) {
         // Recv collision
+		printf("MAC%s dropped incoming package_%u due to receive collision\n", name_, HDR_CMN(p)->uid());
         drop(p, DROP_MAC_COLLISION);
     }
 
     else if (dst != index_ && (u_int32_t)dst != MAC_BROADCAST) {
-		printf("MAC dropped package Due to wrong dst");
+		printf("MAC%s dropped incoming package_%u due to wrong DST\n", name_, HDR_CMN(p)->uid());
         Packet::free(p);
     }
 
     else if(ch->error()) {
         // Packet arrived with errors
         // Check that collisions don't result in this
+		printf("MAC%s dropped incoming package_%u due to packet-errors\n", name_, HDR_CMN(p)->uid());
         drop(p, DROP_MAC_PACKET_ERROR);
     }
     else {
-		printf("Mac passed uid = %u to LL\n",ch->uid());
-
         // Pass packet to LL
         uptarget_->recv(p, (Handler*) 0); 
     }
@@ -212,6 +208,12 @@ void MacSimpleMesh::waitHandler() {
     tx_state_ = MAC_SEND;
 	tx_active_ = 1;
 
+	if (DEBUG) {
+
+		double local_time = Scheduler::instance().clock();
+		printf("MAC sends packet_%u to downtarget t=%f\n", HDR_CMN(pktTx_)->uid(),local_time);
+	}
+	
 	downtarget_->recv(pktTx_, txHandler_);
 }
 

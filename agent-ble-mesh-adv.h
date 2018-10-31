@@ -18,7 +18,8 @@ public:
     int command(int argc, const char*const* argv);
 
 private:
-    long long jitterMax_us; //Maximum jitter for the agent
+    unsigned int jitterMax_us; //Maximum jitter for the agent
+    int clockDrift_ppm; //The constant clock-drift due to variance between crystals on the microcontrollers 
     int recvd_pkts_buffer_size; 
     CircularContainer* recvd_pkts_buffer; //buffer where packet-ids of previously recived packets are stored
 };

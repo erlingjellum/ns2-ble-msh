@@ -17,13 +17,13 @@ public:
 
 
 BleMeshAdvAgent::BleMeshAdvAgent(): Agent(PT_MESSAGE) {
-    
 
-    printf("Created new agent\n");
+    //THIS NEEDS TO GO ELSEWHERE
+    bind("clockDrift_ppm_", &clockDrift_ppm);
     bind("packetSize_", &size_);
     bind("jitterMax_us_", &jitterMax_us);
     bind("recv_pkt_buffer_size_", &recvd_pkts_buffer_size);
-    bind("default_ttl_", &defttl_);
+    bind("ttl_", &defttl_);
 
     recvd_pkts_buffer = new CircularContainer(recvd_pkts_buffer_size);
 }
@@ -35,13 +35,15 @@ void BleMeshAdvAgent::relaymsg(Packet* p) {
     Packet* pkt = p->copy(); // Copy the packet that is to be relayed so that we  send out a new one instead
 
     HDR_IP(pkt)->ttl_--; // Decrement the ttl
+    HDR_CMN(pkt)->direction_ = hdr_cmn::DOWN; //Change the packet direction, we wanna send it DOWN again
+
     double jitter_us = Random::random() % jitterMax_us;
 
     // Start a new timer for sending the packet later 
     SimpleJitterTimer* jitterTimer = new SimpleJitterTimer(this, pkt);
 
     if(DEBUG) {
-        printf("Agent scheduling relay, uid = %u, jitter = %f",HDR_CMN(pkt)->uid(), jitter_us/1000);
+        printf("Agent%s scheduling relay, packet_%u, jitter = %f\n",name_, HDR_CMN(pkt)->uid(), jitter_us/1000);
 
     }
     jitterTimer->start(jitter_us);
@@ -62,13 +64,24 @@ void BleMeshAdvAgent::sendmsg(int uid, const char *flags){
     // THIS PORT HAS TO BE FIXED
     HDR_IP(p)->dst().port_ = 42;
 
+    // Generate a random jitter
     double jitter_us = Random::random() % jitterMax_us;
     SimpleJitterTimer* jitterTimer = new SimpleJitterTimer(this, p);
+    
+    // Account for clock-drift
+    double clockDrift_offset = Scheduler::instance().clock() * clockDrift_ppm / 1000000;
+
+
+    //Add this packet to the received packet buffer, so that we will not relay it
+    // when we receive the relayed version back
+    recvd_pkts_buffer->push(uid);
+
     if(DEBUG) {
-        printf("Agent scheduling packet, %u, jitter = %f\n", HDR_CMN(p)->uid(),jitter_us/1000);
+        
+        printf("Agent%s scheduling packet,t=%f, %u, jitter = %f\n",name_, Scheduler::instance().clock(), HDR_CMN(p)->uid(),jitter_us/1000);
         
     }
-    jitterTimer->start(jitter_us);
+    jitterTimer->start(jitter_us+clockDrift_offset);
 
 }
 
@@ -78,10 +91,8 @@ void BleMeshAdvAgent::sendmsg(Packet* p) {
     // This is made so that the SimpleJitterTimer can call it after the jitter is over
     double local_time = Scheduler::instance().clock();
     HDR_CMN(p)->timestamp() = local_time;
-
-    if(DEBUG) {
-        printf("Agent passing packet downstream uid = %i\n", HDR_CMN(p)->uid());
-    }
+     printf("Agent%s sending packet_%u,t=%f\n",name_, HDR_CMN(p)->uid(), local_time);
+    
     target_->recv(p);
 
 }
@@ -89,17 +100,22 @@ void BleMeshAdvAgent::sendmsg(Packet* p) {
 
 
 void BleMeshAdvAgent::recv(Packet* pkt, Handler*) {
-    if(DEBUG) {
-        printf("Agent received packet\n");
-        printf("%i\n",HDR_IP(pkt)->ttl());
-    }
 
     if (!recvd_pkts_buffer->find(HDR_CMN(pkt)->uid()) && HDR_IP(pkt)->ttl() > 0) {
-        if(DEBUG) {
-            printf("Agent: packet not received before\n");
+
+        if (DEBUG) {
+            double local_time = Scheduler::instance().clock();
+            printf("Agent%s recv new packet_%u t=%f, ttl=%u\n", name_, HDR_CMN(pkt)->uid(),local_time, HDR_IP(pkt)->ttl());
         }
+
         recvd_pkts_buffer->push(HDR_CMN(pkt)->uid_);
         relaymsg(pkt);
+    } else {
+        if (DEBUG) {
+            double local_time = Scheduler::instance().clock();
+            printf("Agent%s recv OLD packet_%u,t=%f, ttl=%u\n", name_, HDR_CMN(pkt)->uid(),local_time, HDR_IP(pkt)->ttl());
+        }
+
     }
 
     Packet::free(pkt); // TODO: Does this ruin things?
@@ -137,7 +153,7 @@ void SimpleJitterTimer::start(double jitter) {
     assert(jitter >= 0);
     Scheduler &s = Scheduler::instance();
 
-    s.schedule(this, &dummyEvent, jitter/1e6);
+    s.schedule(this, &dummyEvent, jitter/1000000);
 }
 
 void SimpleJitterTimer::handle(Event* e) {
