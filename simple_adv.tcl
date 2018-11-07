@@ -1,28 +1,40 @@
+namespace import ::tcl::mathfunc::*
+
 set num_nodes_x 2
 set num_nodes_y 2
-set num_nodes [expr $num_nodes_x*$num_nodes_y]
+
 set spacing_m 1 ;# Spacing between the nodes in the grid
 
-set transmission_period_ms 100
-set nPackets               10
-set jitterMax_ms           10
-set ttl                    10
-set clock_drift            0
+set transmission_period_ms 40.0
+set nPackets               1000
+set jitterMax_ms           0
+set ttl                    0
+set clock_drift            0.0
 
-set mode                "one-to-all" ;# Simulation mode
+set packet_size_bits        369
+
+set mode                "all-to-one" ;# Simulation mode
+set network_layout      "circle-net"
 set master                  0  ;#In a one-to-all or all-to-one which node number is the "one"
 
-Mac/Simple set bandwidth_ 1Mb
+if { $network_layout eq "circle-net"} {
+    set num_nodes 10
+    set master 0
+} else {
+    set num_nodes [expr $num_nodes_x*$num_nodes_y]
+}
 
-Propagation/Shadowing set pathlossExp_ 6.0
-Propagation/Shadowing set std_db_ 1.0
+set PI 3.142
+
+Propagation/Shadowing set pathlossExp_ 0.0
+Propagation/Shadowing set std_db_ 0.0
 Propagation/Shadowing set dist0_ 1.0
 Propagation/Shadowing set seed_ 0
 
 Mac set bandwidth_ 1000kbps
 
 
-Phy/WirelessPhy set CPThresh_ 0.01
+Phy/WirelessPhy set CPThresh_ 10.0
 Phy/WirelessPhy set CSThresh_ 5.011e-13
 Phy/WirelessPhy set RXThresh_ 5.011e-13
 Phy/WirelessPhy set Pt_ 0.005
@@ -68,8 +80,8 @@ set val(rp) DumbAgent
 
 
 # size of the topography
-set size_x              500
-set size_y              500
+set val(size_x)              500
+set val(size_y)              50
 
 
 
@@ -78,12 +90,15 @@ set ns [new Simulator]
 set f [open simple-adv.tr w]
 $ns trace-all $f
 
+set nf [open wireless-flooding-$val(rp).nam w]
+$ns namtrace-all-wireless $nf $val(size_x) $val(size_y)
+
 $ns use-newtrace
 
 # set up topography object
 set topo       [new Topography]
 
-$topo load_flatgrid $size_x $size_y
+$topo load_flatgrid $val(size_x) $val(size_y)
 
 #
 # Create God
@@ -97,7 +112,7 @@ $ns node-config -adhocRouting $val(rp) \
                 -ifqType $val(ifq) \
                 -ifqLen $val(ifqlen) \
                 -antType $val(ant) \
-                -propType $val(prop) \
+                -propType $val(prop)\
                 -phyType $val(netif) \
                 -topoInstance $topo \
                 -agentTrace ON \
@@ -105,61 +120,106 @@ $ns node-config -adhocRouting $val(rp) \
                 -macTrace ON \
                 -movementTrace OFF \
                 -channel [new $val(chan)] \
-                -energyModel val(energy) \
-                -rxPower val(rxPower) \
-                -txPower val(txPower)\
+                -energyModel $val(energy) \
+                -rxPower $val(rxPower) \
+                -txPower $val(txPower)\
                 -initialEnergy 0.1 
 
 
 
+if {$network_layout eq "circle-net"} {
 
-for {set i 0} {$i < $num_nodes_x} {incr i} {
-    for {set j 0} {$j < $num_nodes_y} {incr j} {
-        set index [expr ($i*$num_nodes_x)+$j];#calculate index in 1-D node array
-        puts $index
-        set n($index) [$ns node];# New node object
-        
-        # Set the physical position of the node, only based on spacing
-        $n($index) set X_ $i*$spacing_m;
-        $n($index) set Y_ $j*$spacing_m;
-        $n($index) set Z_ 0
+    Mac/SimpleMesh set node_role_ 1
+    set n(0) [$ns node]
+    $n(0) set X_ 0
+    $n(0) set Y_ 0
+    $n(0) set Z_ 0
+    set a(0) [new Agent/BleMeshAdv]
+    $n(0) attach $a(0) $MESSAGE_PORT
+    $a(0) set ttl_ $ttl
+
+    Mac/SimpleMesh set node_role_ 2
+    
+
+    for {set i 1} {$i < [expr $num_nodes+1]} {incr i} {
+        set n($i) [$ns node]
+        $n($i) set X_ [expr $spacing_m * [sin [expr 2*$PI*$i/$num_nodes]]]
+        $n($i) set Y_ [expr $spacing_m * [cos [expr 2*$PI*$i/$num_nodes]]]
+        $n($i) set Z_ 0
         
         # Attach Transport Protocol Layer to each node
-        set a($index) [new Agent/BleMeshAdv]
-        $n($index) attach $a($index) $MESSAGE_PORT
+        set a($i) [new Agent/BleMeshAdv]
+        $n($i) attach $a($i) $MESSAGE_PORT
+        $a($i) set ttl_ $ttl
+        $a($i) set jitterMax_us_ [expr int($jitterMax_ms*1000)]
+
+    }
+
+} else {
+    for {set i 0} {$i < $num_nodes_x} {incr i} {
+        for {set j 0} {$j < $num_nodes_y} {incr j} {
+            set index [expr ($i*$num_nodes_x)+$j];#calculate index in 1-D node array
+            set n($index) [$ns node];# New node object
+            
+            # Set the physical position of the node, only based on spacing
+            $n($index) set X_ $spacing_m;
+            $n($index) set Y_ $spacing_m;
+            $n($index) set Z_ 0
+            
+            # Attach Transport Protocol Layer to each node
+            set a($index) [new Agent/BleMeshAdv]
+            $n($index) attach $a($index) $MESSAGE_PORT
+        }
     }
 }
+
 
 # Setting up the periodic advertisement events:
 # Choose between a few predefined "modes"
 
-if { [string equal mode "one-to-all"] == 0 } {
-
+if {$mode eq "one-to-all"} {
+    puts "ONE-TO-ALL"
     for {set i 0} {$i < $nPackets} {incr i} {
-
         # Setting up the advertisement packet sends:
         # See agent-ble-mesh-adv.cc for the implementation of "send_adv". 
         # The only parameter is a unique packet identifier that has to be unique for each
         # packet.
         # Jitter (and soon clock drift) will automatically be added in the TP layer. 
-    
-        #$ns at [expr $i*$transmission_period_ms/1000] "$a($master) send_adv $i"
+        $ns at [expr $i*$transmission_period_ms/1000] "$a($master) send_adv $i"
     }
-}
+} elseif {$mode eq "all-to-one"} {
+    puts "ALL-TO-ONE"
+    for {set i 0} {$i < $nPackets} {incr i} {
+        for {set j 0} {$j < [expr $num_nodes + 1]} {incr j} {
+            if {$j != $master} {
+               # $ns at [expr $i*$transmission_period_ms/1000] "$a($j) send_adv [expr $i*$num_nodes + $j]"
+            }
+        }
+    }
 
+    $ns at 1.00 "$a(1) send_adv 1"
+    $ns at 1.000367 "$a(2) send_adv 2"
 
-$ns at 1.0 "$a($master) send_adv 1"
-$ns at 2.5 "$a($master) send_adv 2"
-$ns at 3.0 "$a($master) send_adv 3"
+    $ns at 1.000734 "$a(3) send_adv 3"
+    
+} 
+
 
 
 # Stop simulation after some time that guarantees that all events have passed.
 $ns at [expr (($nPackets+$ttl)*$transmission_period_ms/1000) + 5] finish
 
+
+
+
 proc finish {} {
-    global ns f val
+    global ns f nf val a master transmission_period_ms nPackets
     $ns flush-trace
     close $f
+    close $nf
+    puts [$a($master) set packets_received_]
+
+    puts [expr [$a($master) set packets_received_]*369000/($transmission_period_ms*$nPackets)]
     
 
     exit 0

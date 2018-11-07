@@ -1,8 +1,10 @@
 #include "agent-ble-mesh-adv.h"
-#include "random.h"
+#include <stdlib.h>
+#include <time.h>
 #include "address.h"
 #include "ip.h"
 #include "mac.h"
+#include "mac-simple-mesh.h"
 
 const bool DEBUG = true;
 
@@ -11,21 +13,25 @@ static class BleMeshAdvAgentClass : public TclClass {
 public:
     BleMeshAdvAgentClass() : TclClass("Agent/BleMeshAdv") {}
     TclObject* create(int argc, const char*const* argv) {
-        return (new BleMeshAdvAgent());
+        return (new BleMeshAdvAgent(argc, argv));
     }    
 } class_blemshadv;
 
 
-BleMeshAdvAgent::BleMeshAdvAgent(): Agent(PT_MESSAGE) {
+BleMeshAdvAgent::BleMeshAdvAgent(int argc, const char*const* argv): Agent(PT_MESSAGE) {
 
     //THIS NEEDS TO GO ELSEWHERE
     bind("clockDrift_ppm_", &clockDrift_ppm);
     bind("packetSize_", &size_);
     bind("jitterMax_us_", &jitterMax_us);
-    bind("recv_pkt_buffer_size_", &recvd_pkts_buffer_size);
+    bind("packets_received_", &packets_received);
     bind("ttl_", &defttl_);
 
+    recvd_pkts_buffer_size = 100; // NOTE THIS SIZE
     recvd_pkts_buffer = new CircularContainer(recvd_pkts_buffer_size);
+
+    printf("seed = %i\n", time(NULL));
+    srand(time(NULL));
 }
 
 
@@ -36,9 +42,11 @@ void BleMeshAdvAgent::relaymsg(Packet* p) {
 
     HDR_IP(pkt)->ttl_--; // Decrement the ttl
     HDR_CMN(pkt)->direction_ = hdr_cmn::DOWN; //Change the packet direction, we wanna send it DOWN again
+    double jitter_us = 0;
 
-    double jitter_us = Random::random() % jitterMax_us;
-
+    if (jitterMax_us > 0) { 
+        jitter_us = rand() % jitterMax_us;
+    }
     // Start a new timer for sending the packet later 
     SimpleJitterTimer* jitterTimer = new SimpleJitterTimer(this, pkt);
 
@@ -65,7 +73,11 @@ void BleMeshAdvAgent::sendmsg(int uid, const char *flags){
     HDR_IP(p)->dst().port_ = 42;
 
     // Generate a random jitter
-    double jitter_us = Random::random() % jitterMax_us;
+    double jitter_us = 0;
+
+    if (jitterMax_us > 0) { 
+        jitter_us = rand() % jitterMax_us;
+    }
     SimpleJitterTimer* jitterTimer = new SimpleJitterTimer(this, p);
     
     // Account for clock-drift
@@ -101,15 +113,19 @@ void BleMeshAdvAgent::sendmsg(Packet* p) {
 
 void BleMeshAdvAgent::recv(Packet* pkt, Handler*) {
 
-    if (!recvd_pkts_buffer->find(HDR_CMN(pkt)->uid()) && HDR_IP(pkt)->ttl() > 0) {
+    if (!recvd_pkts_buffer->find(HDR_CMN(pkt)->uid())) {
 
         if (DEBUG) {
             double local_time = Scheduler::instance().clock();
             printf("Agent%s recv new packet_%u t=%f, ttl=%u\n", name_, HDR_CMN(pkt)->uid(),local_time, HDR_IP(pkt)->ttl());
         }
-
+        packets_received++;
         recvd_pkts_buffer->push(HDR_CMN(pkt)->uid_);
-        relaymsg(pkt);
+
+        if ((HDR_IP(pkt)->ttl()) > 0) {
+            relaymsg(pkt);
+        }
+        
     } else {
         if (DEBUG) {
             double local_time = Scheduler::instance().clock();

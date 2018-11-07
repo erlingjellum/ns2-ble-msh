@@ -10,7 +10,7 @@ class CircularContainer;
 
 class BleMeshAdvAgent : public Agent {
 public:
-    BleMeshAdvAgent();
+    BleMeshAdvAgent(int argc, const char*const* argv);
     void relaymsg(Packet* pkt);
     void sendmsg(int uid, const char *flags = 0);
     void sendmsg(Packet* p);
@@ -19,7 +19,8 @@ public:
 
 private:
     unsigned int jitterMax_us; //Maximum jitter for the agent
-    int clockDrift_ppm; //The constant clock-drift due to variance between crystals on the microcontrollers 
+    int clockDrift_ppm; //The constant clock-drift due to variance between crystals on the microcontrollers
+    unsigned int packets_received; 
     int recvd_pkts_buffer_size; 
     CircularContainer* recvd_pkts_buffer; //buffer where packet-ids of previously recived packets are stored
 };

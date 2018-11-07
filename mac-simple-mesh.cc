@@ -19,6 +19,9 @@ public:
 MacSimpleMesh::MacSimpleMesh() : Mac() {
     rx_state_ = tx_state_ = MAC_IDLE;
     tx_active_ = 0;
+
+	bind("node_role_", &node_role);
+
     waitTimer = new MacSimpleMeshWaitTimer(this);
     sendTimer = new MacSimpleMeshSendTimer(this);
     recvTimer = new MacSimpleMeshRecvTimer(this);
@@ -42,6 +45,12 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 	 * If we are transmitting, then set the error bit in the packet
 	 * so that it will be thrown away
 	 */
+
+	// If our node is in advertisement mode. Just drop packet
+	if (node_role == 2) {
+		Packet::free(p);
+		return;
+	}
 	
 	// in full duplex mode it can recv and send at the same time
 	if (tx_active_)
@@ -127,12 +136,6 @@ void MacSimpleMesh::send(Packet *p, Handler *h) {
     if (rx_state_ == MAC_IDLE) {
         // We are idle and can send right away
 
-		if (DEBUG) {
-
-		double local_time = Scheduler::instance().clock();
-		printf("MAC was IDLE packet_%u to downtarget t=%f\n", HDR_CMN(pktTx_)->uid(),local_time);
-		}
-
         waitHandler();
         sendTimer->restart(ch->txtime());
     }
@@ -177,6 +180,7 @@ void MacSimpleMesh::recvHandler() {
     if (tx_active_) {
         // We are currently sending another packet
         // TODO THIS SHOULD BE LOGGED
+		printf("We are sending a packet while receiving, code error\n");
         Packet::free(p);
     }
 
@@ -208,12 +212,6 @@ void MacSimpleMesh::waitHandler() {
     tx_state_ = MAC_SEND;
 	tx_active_ = 1;
 
-	if (DEBUG) {
-
-		double local_time = Scheduler::instance().clock();
-		printf("MAC sends packet_%u to downtarget t=%f\n", HDR_CMN(pktTx_)->uid(),local_time);
-	}
-	
 	downtarget_->recv(pktTx_, txHandler_);
 }
 

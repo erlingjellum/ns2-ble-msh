@@ -10,6 +10,8 @@ class MacSimpleMeshWaitTimer;
 class MacSimpleMeshSendTimer;
 class MacSimpleMeshRecvTimer;
 
+// enum Role {ADV_RECV = 1, ADV_ONLY = 2, RECV_ONLY = 3};
+
 class MacSimpleMesh : public Mac {
 
 public:
@@ -26,6 +28,9 @@ public:
 private:
 	Packet *	pktRx_;
 	Packet *	pktTx_;
+	
+	// Node role should probably be implemented somewhere else.
+	int		 	node_role;			// To enable nodes that are purely advertising and does not listen to the channel
     MacState        rx_state_;      // incoming state (MAC_RECV or MAC_IDLE)
 	MacState        tx_state_;      // outgoing state
     int             tx_active_;
