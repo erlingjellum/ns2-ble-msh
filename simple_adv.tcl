@@ -5,11 +5,11 @@ set num_nodes_y 2
 
 set spacing_m 1 ;# Spacing between the nodes in the grid
 
-set transmission_period_ms 40.0
+set transmission_period_ms 400.0
 set nPackets               1000
-set jitterMax_ms           0
+set jitterMax_ms           10
 set ttl                    0
-set clock_drift            0.0
+set clock_drift_ppm        40
 
 set packet_size_bits        369
 
@@ -18,7 +18,7 @@ set network_layout      "circle-net"
 set master                  0  ;#In a one-to-all or all-to-one which node number is the "one"
 
 if { $network_layout eq "circle-net"} {
-    set num_nodes 10
+    set num_nodes 50
     set master 0
 } else {
     set num_nodes [expr $num_nodes_x*$num_nodes_y]
@@ -152,6 +152,7 @@ if {$network_layout eq "circle-net"} {
         $n($i) attach $a($i) $MESSAGE_PORT
         $a($i) set ttl_ $ttl
         $a($i) set jitterMax_us_ [expr int($jitterMax_ms*1000)]
+        $a($i) set clockDrift_ppm_ [expr floor(rand()*$clock_drift_ppm)]
 
     }
 
@@ -192,15 +193,15 @@ if {$mode eq "one-to-all"} {
     for {set i 0} {$i < $nPackets} {incr i} {
         for {set j 0} {$j < [expr $num_nodes + 1]} {incr j} {
             if {$j != $master} {
-               # $ns at [expr $i*$transmission_period_ms/1000] "$a($j) send_adv [expr $i*$num_nodes + $j]"
+                $ns at [expr $i*$transmission_period_ms/1000] "$a($j) send_adv [expr $i*$num_nodes + $j]"
             }
         }
     }
 
-    $ns at 1.00 "$a(1) send_adv 1"
-    $ns at 1.000367 "$a(2) send_adv 2"
+#    $ns at 1.00 "$a(1) send_adv 1"
+ #   $ns at 1.000367 "$a(2) send_adv 2"
 
-    $ns at 1.000734 "$a(3) send_adv 3"
+  #  $ns at 1.000734 "$a(3) send_adv 3"
     
 } 
 

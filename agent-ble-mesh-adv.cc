@@ -5,6 +5,8 @@
 #include "ip.h"
 #include "mac.h"
 #include "mac-simple-mesh.h"
+#include <cmath>
+#include <string> 
 
 const bool DEBUG = true;
 
@@ -30,8 +32,9 @@ BleMeshAdvAgent::BleMeshAdvAgent(int argc, const char*const* argv): Agent(PT_MES
     recvd_pkts_buffer_size = 100; // NOTE THIS SIZE
     recvd_pkts_buffer = new CircularContainer(recvd_pkts_buffer_size);
 
-    printf("seed = %i\n", time(NULL));
-    srand(time(NULL));
+    // FIND THE NUMBER IN ARGV[0] and FUCKING EXTRACT IT
+    int simple_hash = atoi(argv[0]+2);
+    srand(time(NULL)+simple_hash);
 }
 
 
@@ -45,7 +48,7 @@ void BleMeshAdvAgent::relaymsg(Packet* p) {
     double jitter_us = 0;
 
     if (jitterMax_us > 0) { 
-        jitter_us = rand() % jitterMax_us;
+        jitter_us = ((double) rand() / RAND_MAX) * jitterMax_us;
     }
     // Start a new timer for sending the packet later 
     SimpleJitterTimer* jitterTimer = new SimpleJitterTimer(this, pkt);
@@ -91,7 +94,7 @@ void BleMeshAdvAgent::sendmsg(int uid, const char *flags){
     if(DEBUG) {
         
         printf("Agent%s scheduling packet,t=%f, %u, jitter = %f\n",name_, Scheduler::instance().clock(), HDR_CMN(p)->uid(),jitter_us/1000);
-        
+        printf("CLOCK DRIFT = %f\n", clockDrift_offset);
     }
     jitterTimer->start(jitter_us+clockDrift_offset);
 
@@ -103,8 +106,10 @@ void BleMeshAdvAgent::sendmsg(Packet* p) {
     // This is made so that the SimpleJitterTimer can call it after the jitter is over
     double local_time = Scheduler::instance().clock();
     HDR_CMN(p)->timestamp() = local_time;
-     printf("Agent%s sending packet_%u,t=%f\n",name_, HDR_CMN(p)->uid(), local_time);
-    
+
+    if(DEBUG) {
+        printf("Agent%s sending packet_%u,t=%f\n",name_, HDR_CMN(p)->uid(), local_time);
+    }
     target_->recv(p);
 
 }
