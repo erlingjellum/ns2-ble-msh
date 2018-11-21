@@ -1,7 +1,7 @@
 namespace import ::tcl::mathfunc::*
 
 set num_nodes_x 2
-set num_nodes_y 2
+set num_nodes_y 20.0
 
 set spacing_m 1 ;# Spacing between the nodes in the grid
 
@@ -146,6 +146,7 @@ if {$network_layout eq "circle-net"} {
         $n($i) set X_ [expr $spacing_m * [sin [expr 2*$PI*$i/$num_nodes]]]
         $n($i) set Y_ [expr $spacing_m * [cos [expr 2*$PI*$i/$num_nodes]]]
         $n($i) set Z_ 0
+        $ns initial_node_pos $n($i) 20
         
         # Attach Transport Protocol Layer to each node
         set a($i) [new Agent/BleMeshAdv]
