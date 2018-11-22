@@ -1,8 +1,10 @@
 #package require tooltip
+global gui_progress
+global .probar
 
 set num_nodes_x             5
 set num_nodes_y             5
-set spacing_m               2
+set spacing_m               5
 
 set master_index            0
 
@@ -10,10 +12,10 @@ set jitterMax_ms            10
 set transmission_period_ms  100
 set clock_drift             0
 set ttl                     10
-set n_packets                100
+set n_packets               100
 set mode                    "one-to-all"
 set bandwidth               1Mb
-set pathloss_exp             6.0
+set pathloss_exp            6.0
 set std_db                  1.0
 set dist0                   1.0
 set seed                    0
@@ -32,16 +34,30 @@ set node_env                 "free-space"
 set node_list {}
 array set node_relay {}
 set node_select               "(0,0)"
+set gui_progress            0
+
+
 
 
 #TODO:
-# Add the following parameters: node environment, node cache memory, logging
-# TX power, RX power. Try to make things as drop-down menus instead
-# Consider what and how the results should be made
-#
+# Add the following parameters: node environment, node cache memory, loggin
+wm title . "BLE-Mesh Simulator v0.1"
+
+# Menubar
+menu .mbar
+. configure -menu .mbar
+
+menu .mbar.fl -tearoff 0
+.mbar add cascade -menu .mbar.fl -label File -underline 0
+.mbar.fl add command -label About... -command {open_about_window}
+.mbar.fl add command -label Exit -command {exit}
 
 
+# Progress bar
+ttk::progressbar .probar -mode determinate -orient horizontal -length 100 -variable gui_progress
 
+# ALL USER INPUT PARAMETERS
+#####################################################
 label .tx_power_label -text "TX power" -justify left
 ttk::combobox .tx_power_entry -textvariable TX_power\
                                 -state readonly\
@@ -131,11 +147,11 @@ button .start_button -text "Start" -command "run_ns"
 # tooltip::tooltip .master_index_label "The node index of the master node. One-To-All: Master = Advertiser. All-To-One: Master = Receiver\n The index is given as the position in the flattend out node matrix. For node (i,j) index = i*num_nodes_x + j"
 # tooltip::tooltip .disable_relay_index_label "Give a space separated list of the indices of the nodes that should, for any reason, not relay messages received\nIn BLE Mesh the standard is that all nodes relays all new packets, but this can saturate the channel and therefore, some nodes can be configured to not relay received packets." 
 
-# add traces to trigger procedures from changes in values
 
-#Call the update_node_list() whenever we changes these values
 
- 
+# Procedures for the TK GUI
+###############################################################################3
+
 # Procedure to call each time the dimensions of the grid has changed
 # And we need to update the node_list
 proc update_node_list {name1 name2 op} {
@@ -148,14 +164,22 @@ proc update_node_list {name1 name2 op} {
             set index [expr $i*$num_nodes_x + $j]
             lappend node_list "($i, $j)"
             set node_relay($index) 1
-    }
+        }
 
     .node_select_entry configure -textvariable node_select\
                                 -values $node_list\
                                 -state readonly
 
+    }
+
 }
 
+proc open_about_window {} {
+    toplevel .a
+    wm title .a "About"
+    label .a.text -text "BLE Mesh Simulator\nVersion 0.1\nCopyright 2018 Nordic Semiconductor ASA\nSimulates a grid of BLE nodes running the BLE Mesh protocol with NS2" 
+
+    grid .a.text
 }
 
 
@@ -188,6 +212,9 @@ proc update_master {} {
 
 update_node_list 1 2 3 
 update_node_options 1 2 3 
+
+# Configure the layout of the GUI 
+######################################
 
 set i 0
 
@@ -233,39 +260,21 @@ grid .node_master_button -row $i -column 1
 
 
 grid .start_button   -row [incr i] -column 0
-
+grid .probar          -row $i   -column 1
 
 
 #########################################################
 ##############   SETUP AND SIMULATION ####################
 ##########################################################
 
-
-proc run {} {
-    global num_nodes_x num_nodes_y spacing_m master_index jitterMax_ms\
-            transmission_period_ms clock_drift ttl n_packets mode bandwidth\
-            TX_power node_env node_relay 
-    
-    set fp [open "params.txt" w]
-    puts $fp $num_nodes_x; puts $fp $num_nodes_y
-    puts $fp $spacing_m; puts $fp $master_index
-    puts $fp $jitterMax_ms; puts $fp $transmission_period_ms;
-    puts $fp $clock_drift; puts $fp $n_packets
-    puts $fp $mode;  puts $fp $bandwidth; puts $fp $TX_power
-    puts $fp $node_env; puts $fp $ttl;
-    for {set i 0} {$i < [expr $num_nodes_x*$num_nodes_y]} {incr i} {
-        puts -nonewline $fp "$node_relay($i) "
-    }
-
-    close $fp 
-
-}
-
 proc run_ns {} {
     global num_nodes_x num_nodes_y spacing_m master_index jitterMax_ms\
             transmission_period_ms clock_drift ttl n_packets mode bandwidth\
-            TX_power node_env node_relay ns f a
+            TX_power node_env node_relay ns f a num_nodes n gui_progress
+
     set num_nodes [expr $num_nodes_x*$num_nodes_y]
+
+    # Print the input parameters from the GUI
     puts "num_nodes_x = $num_nodes_x"; puts "num_nodes_y = $num_nodes_y"
     puts "Spacing between nodes = $spacing_m"; puts "Index of master = $master_index"
     puts "jitterMax = $jitterMax_ms"; puts "TxP = $transmission_period_ms";
@@ -288,23 +297,26 @@ proc run_ns {} {
     Phy/WirelessPhy set CPThresh_ 12.0
 
     # Receiver sensitivity. Using indep-tools/propagation/threshold.cc to find it
-    Phy/WirelessPhy set RXThresh_ 1.87e-07
+    Phy/WirelessPhy set RXThresh_ 9.27e-10
     
     # Antenna strength (0dbm = 1mW)
-    if {$TX_power eq "-4dm"} {
+    if {$TX_power eq "-4dBm"} {
         Phy/WirelessPhy set Pt_ 0.0004
-    } elseif {$TX_power eq "0dm"} {
+    } elseif {$TX_power eq "0dBm"} {
         Phy/WirelessPhy set Pt_ 0.001
-    } elseif {$TX_power eq "+4dm"} {
+    } elseif {$TX_power eq "+4Bdm"} {
         Phy/WirelessPhy set Pt_ 0.0025
     }
+
+    # Set receiver frequency BLE is 2.4-2.485Ghz
+    Phy/WirelessPhy set freq_ 2.48e+09
     
     # Antenna parameters. Not changed
-    Antenna/OmniAntenna set X_ 0
-    Antenna/OmniAntenna set Y_ 0
-    Antenna/OmniAntenna set Z_ 1.5
-    Antenna/OmniAntenna set Gt_ 1
-    Antenna/OmniAntenna set Gr_ 1
+    # Antenna/OmniAntenna set X_ 0
+    # Antenna/OmniAntenna set Y_ 0
+    # Antenna/OmniAntenna set Z_ 1.5
+    # Antenna/OmniAntenna set Gt_ 1
+    # Antenna/OmniAntenna set Gr_ 1
 
     # LinkLayer parameters, not touched
     LL set mindelay_                0
@@ -330,28 +342,25 @@ proc run_ns {} {
     set val(initialEnergy)  0.1; #Not important
     set val(rp) DumbAgent
 
-    set val(size_x)              [expr $num_nodes_x * 10]
-    set val(size_y)              [expr $num_nodes_y * 10]
+    set val(size_x)              [expr $num_nodes_x * $spacing_m]
+    set val(size_y)              [expr $num_nodes_y * $spacing_m]
 
     # Create topography
     set topo [new Topography]
     $topo load_flatgrid $val(size_x) $val(size_y)
 
     # Create General Operations Director
-    create-god $num_nodes
+    create-god $num_nodes 
 
     # Create Simulator object
     set ns [new Simulator]
     set f [open simple-adv.tr w]
     set nf [open ble-mesh.nam w]
 
-    $ns namtrace-all-wireless $nf $val(size_x) $val(size_y)
-
-    $ns use-trace
+    $ns namtrace-all-wireless $nf $val(size_x) $val(size_y)  
 
     $ns trace-all $f
 
-    create-god $num_nodes
 
     # Set default node-config
     $ns node-config -adhocRouting $val(rp) \
@@ -368,17 +377,17 @@ proc run_ns {} {
                 -macTrace ON \
                 -movementTrace OFF \
                 -channel [new $val(chan)] \
-                -energyModel $val(energy) \
-                -rxPower $val(rxPower) \
-                -txPower $val(txPower)\
-                -initialEnergy $val(initialEnergy)
+                #-energyModel $val(energy) \
+                #-rxPower $val(rxPower) \
+                #-txPower $val(txPower)\
+                #-initialEnergy $val(initialEnergy)
 
     # Creating all nodes
 
     for {set i 0} {$i < $num_nodes_y} {incr i} {
         for {set j 0} {$j < $num_nodes_x} {incr j} {
             set index [expr ($i*$num_nodes_x)+$j];#calculate index in 1-D node array
-            
+
             # Set node-specific properties
             if {$node_relay($index)} {
                 Mac/SimpleMesh set node_role_ 1 ;#Relay is on
@@ -389,9 +398,11 @@ proc run_ns {} {
             set n($index) [$ns node];# New node object
             
             # Set the physical position of the node, only based on spacing
-            $n($index) set X_ $spacing_m*$j;
-            $n($index) set Y_ $spacing_m*$i;
+            $n($index) set X_ [expr $spacing_m*$j];
+            $n($index) set Y_ [expr $spacing_m*$i];
             $n($index) set Z_ 0
+            $ns initial_node_pos $n($index) 20
+            puts "Node_$index X = [$n($index) set X_], Y = [$n($index) set Y_]"
             
             # Attach Transport Protocol Layer to each node
             set a($index) [new Agent/BleMeshAdv]
@@ -399,9 +410,17 @@ proc run_ns {} {
             $a($index) set jitterMax_us_ [expr int($jitterMax_ms*1000)]
             $a($index) set clockDrift_ppm_ [expr floor(rand()*$clock_drift)]
             $n($index) attach $a($index) $MESSAGE_PORT
+
+            
         }
     
     }
+
+    for {set index 0} {$index < $num_nodes} {incr index} {
+            puts "Node_$index X = [$n($index) set X_], Y = [$n($index) set Y_]"
+        }
+
+
 
     # Setting up the advertisement packages
 
@@ -423,12 +442,20 @@ proc run_ns {} {
     # Finish simulation at the time guaranteed to be past all events
     $ns at [expr (($n_packets+$ttl)*$transmission_period_ms/1000)*2] finish
 
+    # Create events for updating the progressbar
+    for {set index 1} {$index < 101} {incr index} {
+        $ns at [expr ($index * $n_packets * $transmission_period_ms/100000)] update_progressbar
+    }
 
     # Procedure to be called after Simulation is done.
     proc finish {} {
-        global ns f mode a transmission_period_ms n_packets num_nodes_x num_nodes_y
+        global ns n f mode a transmission_period_ms n_packets num_nodes num_nodes_x num_nodes_y
         $ns flush-trace
         close $f
+
+        for {set index 0} {$index < $num_nodes} {incr index} {
+            puts "Node_$index X = [$n($index) set X_], Y = [$n($index) set Y_]"
+        }
 
         if {$mode eq "one-to-all"} {
             set total_success 0
@@ -448,13 +475,23 @@ proc run_ns {} {
             puts "MODE: ALL TO ONE"
         }
 
-        exec  ../../ns/nam-1.15/nam ble-mesh.nam ble-mesh.nam &
+        #exec  ../../ns/nam-1.15/nam ble-mesh.nam &
 
         exit 0
     }
-    
+
+    proc update_progressbar {} {
+        global gui_progress
+        incr gui_progress
+        update idletasks
+
+
+    }
+
     $ns run
-} 
+}
+    
+    
 
 ############################################################################
 
