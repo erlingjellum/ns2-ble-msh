@@ -8,7 +8,7 @@
 #include <cmath>
 #include <string> 
 
-const bool DEBUG = true;
+const bool DEBUG = false;
 
 // TCL bindings
 static class BleMeshAdvAgentClass : public TclClass {
@@ -22,19 +22,29 @@ public:
 
 BleMeshAdvAgent::BleMeshAdvAgent(int argc, const char*const* argv): Agent(PT_MESSAGE) {
 
-    //THIS NEEDS TO GO ELSEWHERE
+    //TODO: packets received and cache size should not be bound but should rather have getters to
+    // return them. Changing them from the TCL scripts makes no sense
     bind("clockDrift_ppm_", &clockDrift_ppm);
     bind("packetSize_", &size_);
     bind("jitterMax_us_", &jitterMax_us);
     bind("packets_received_", &packets_received);
-    bind("ttl_", &defttl_);
+    bind("ttl_", &ttl);
+    bind("cache_size_", &node_cache_size);
+    bind("node_id_", &node_id);
+    bind("relay_", &relay);
+    
 
-    recvd_pkts_buffer_size = 100; // NOTE THIS SIZE
-    recvd_pkts_buffer = new CircularContainer(recvd_pkts_buffer_size);
-
-    // FIND THE NUMBER IN ARGV[0] and FUCKING EXTRACT IT
     int simple_hash = atoi(argv[0]+2);
     srand(time(NULL)+simple_hash);
+
+    // Create the cache memory
+    node_cache = new CircularContainer(node_cache_size);
+
+    // Create the packet memory each node can max store 10 000 packets. Thats probably enough.
+    recvd_pkts_buffer = new CircularContainer(10000);
+
+    recvd_pkts_stats = new PacketsReceivedContainer();
+    
 }
 
 
@@ -45,19 +55,12 @@ void BleMeshAdvAgent::relaymsg(Packet* p) {
 
     HDR_IP(pkt)->ttl_--; // Decrement the ttl
     HDR_CMN(pkt)->direction_ = hdr_cmn::DOWN; //Change the packet direction, we wanna send it DOWN again
-    double jitter_us = 0;
-
-    if (jitterMax_us > 0) { 
-        jitter_us = ((double) rand() / RAND_MAX) * jitterMax_us;
-    }
-    // Start a new timer for sending the packet later 
-    SimpleJitterTimer* jitterTimer = new SimpleJitterTimer(this, pkt);
-
+   
     if(DEBUG) {
-        printf("Agent%s scheduling relay, packet_%u, jitter = %f\n",name_, HDR_CMN(pkt)->uid(), jitter_us/1000);
+        printf("Agent%s scheduling relay, packet_%u\n",name_, HDR_CMN(pkt)->uid());
 
     }
-    jitterTimer->start(jitter_us);
+    sendmsg(pkt);
 }
 
 
@@ -66,21 +69,17 @@ void BleMeshAdvAgent::sendmsg(int uid, const char *flags){
     p = allocpkt();
 
     //TODO Verify that the input parameters are correct
-
     HDR_CMN(p)->size() = size_;
     HDR_CMN(p)->uid() = uid;
-    HDR_IP(p)->ttl() = defttl_;
+    HDR_IP(p)->ttl() = ttl;
     HDR_IP(p)->dst().addr_ = MAC_BROADCAST;
+    HDR_IP(p)->src().addr_ = node_id;
+
 
     // THIS PORT HAS TO BE FIXED
     HDR_IP(p)->dst().port_ = 42;
 
-    // Generate a random jitter
-    double jitter_us = 0;
-
-    if (jitterMax_us > 0) { 
-        jitter_us = rand() % jitterMax_us;
-    }
+   
     SimpleJitterTimer* jitterTimer = new SimpleJitterTimer(this, p);
     
     // Account for clock-drift
@@ -90,13 +89,14 @@ void BleMeshAdvAgent::sendmsg(int uid, const char *flags){
     //Add this packet to the received packet buffer, so that we will not relay it
     // when we receive the relayed version back
     recvd_pkts_buffer->push(uid);
+    node_cache->push(uid);
 
     if(DEBUG) {
         
-        printf("Agent%s scheduling packet,t=%f, %u, jitter = %f\n",name_, Scheduler::instance().clock(), HDR_CMN(p)->uid(),jitter_us/1000);
+        printf("Agent%s scheduling packet,t=%f, %u\n",name_, Scheduler::instance().clock(), HDR_CMN(p)->uid());
         printf("CLOCK DRIFT = %f\n", clockDrift_offset);
     }
-    jitterTimer->start(jitter_us+clockDrift_offset);
+    jitterTimer->start(clockDrift_offset);
 
 }
 
@@ -118,18 +118,27 @@ void BleMeshAdvAgent::sendmsg(Packet* p) {
 
 void BleMeshAdvAgent::recv(Packet* pkt, Handler*) {
 
-    if (!recvd_pkts_buffer->find(HDR_CMN(pkt)->uid())) {
+    if (!node_cache->find(HDR_CMN(pkt)->uid())) {
+        // This packet is not in the (limited) node cache memory
 
         if (DEBUG) {
             double local_time = Scheduler::instance().clock();
             printf("Agent%s recv new packet_%u t=%f, ttl=%u\n", name_, HDR_CMN(pkt)->uid(),local_time, HDR_IP(pkt)->ttl());
         }
-        packets_received++;
-        recvd_pkts_buffer->push(HDR_CMN(pkt)->uid_);
 
-        if ((HDR_IP(pkt)->ttl()) > 0) {
-            relaymsg(pkt);
+        node_cache->push(HDR_CMN(pkt)->uid_);
+
+        if(!recvd_pkts_buffer->find(HDR_CMN(pkt)->uid())) {
+            // This packet was really never received here
+            packets_received++;
+            recvd_pkts_buffer->push(HDR_CMN(pkt)->uid_);
+            recvd_pkts_stats->add(pkt);
+
         }
+
+        if ((HDR_IP(pkt)->ttl()) > 0 && relay) {
+            relaymsg(pkt);
+        } 
         
     } else {
         if (DEBUG) {
@@ -147,12 +156,39 @@ void BleMeshAdvAgent::recv(Packet* pkt, Handler*) {
 
 
 int BleMeshAdvAgent::command(int argc, const char*const* argv) {
-    if (argc == 3) {
-        if (strcmp(argv[1], "send_adv") == 0) {
+    if (argc == 3) { // Send an advertisement message
+        if (strcmp(argv[1], "send-adv") == 0) {
             sendmsg(atoi(argv[2]),0);
             return TCL_OK;
         }
-    } 
+        
+    } else if (argc == 4) {
+        if (strcmp(argv[1], "sett") == 0) {
+            if (strcmp(argv[2], "cache-size") == 0) { //Change the cache size (should only be called during initalization)
+                node_cache_size = atoi(argv[3]);
+                node_cache = new CircularContainer(node_cache_size);
+                return TCL_OK;
+            }
+
+            if (strcmp(argv[2],"node-id") == 0) {
+                node_id = atoi(argv[3]);
+                return TCL_OK;
+            }
+
+            if (strcmp(argv[2], "ttl") == 0) {
+                ttl = atoi(argv[3]);
+                return TCL_OK;
+            }
+        }
+
+        if (strcmp(argv[1], "get") == 0) {
+            if (strcmp(argv[2], "packets-received-from-node") == 0) {
+                Tcl& tcl = Tcl::instance();
+                tcl.resultf("%d",recvd_pkts_stats->get(atoi(argv[3])));
+                return TCL_OK;
+            }
+        }
+    }
 
     return Agent::command(argc, argv);
 }
@@ -212,3 +248,40 @@ int CircularContainer::find(int value) {
 
 
 
+// Packets Recevied per node container
+
+
+// A few thoughts:
+// 1. Make Node ID a part of the construction of the agent (an int is passed as it is constructed). ID will
+// also need to be a public variable of the agent
+// 2. Edit the packet sending mechanism so that the SRC field is written with the node_id
+// 3. Index the PacketsReceived with this node_id
+
+
+void PacketsReceivedContainer::add(Packet* pkt) {
+    
+    for(int i = 0; i < size; i++)
+    {
+        if (pkts_recvd[i][0] == HDR_IP(pkt)->src().addr_) {
+            pkts_recvd[i][1]++;
+            return;
+        }
+    }
+    
+    // First packet we receive from this node
+    std::vector<int> new_entry(2,1);
+    new_entry[0] = HDR_IP(pkt)->src().addr_;
+    pkts_recvd.push_back(new_entry);
+    size++;
+}
+
+
+int PacketsReceivedContainer::get(int n_id){
+    for(int i = 0; i < size; i++) {
+        if (pkts_recvd[i][0] == n_id) {
+            return pkts_recvd[i][1];
+           
+        }
+    }
+   return 0;
+}

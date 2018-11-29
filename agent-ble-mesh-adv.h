@@ -7,6 +7,7 @@
 #include <vector>
 
 class CircularContainer;
+class PacketsReceivedContainer;
 
 class BleMeshAdvAgent : public Agent {
 public:
@@ -20,9 +21,16 @@ public:
 private:
     unsigned int jitterMax_us; //Maximum jitter for the agent
     int clockDrift_ppm; //The constant clock-drift due to variance between crystals on the microcontrollers
-    unsigned int packets_received; 
-    int recvd_pkts_buffer_size; 
+    int packets_received; 
+    int node_id;
+    int ttl;
+    int node_cache_size;
+    int recvd_pkts_buffer_size;
+    int relay; // Is relay activated for this node? 
     CircularContainer* recvd_pkts_buffer; //buffer where packet-ids of previously recived packets are stored
+    CircularContainer* node_cache; // Modelling the node cache memory for storing prviously received packets to prevent
+    PacketsReceivedContainer* recvd_pkts_stats; //Statstics over where the packets are from
+    // relaying packets several times.
 };
 
 class SimpleJitterTimer: public Handler {
@@ -51,6 +59,18 @@ private:
     int max_size_;
     int size_;
 
+};
+
+class PacketsReceivedContainer {
+public:
+    PacketsReceivedContainer() : size(0) {}
+    void add(Packet* pkt);
+    int get(int n_id);
+    
+
+private:
+    std::vector<std::vector<int> > pkts_recvd;
+    int size;
 };
 
 #endif

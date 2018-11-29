@@ -5,6 +5,7 @@
 #define ns_mac_simple_mesh_h
 
 #include "mac-simple.h"
+#include "queue.h"
 
 class MacSimpleMeshWaitTimer;
 class MacSimpleMeshSendTimer;
@@ -15,22 +16,24 @@ class MacSimpleMeshRecvTimer;
 class MacSimpleMesh : public Mac {
 
 public:
-	MacSimpleMesh();
+	MacSimpleMesh(int argc, const char*const* argv);
 	void recv(Packet *p, Handler *h);
 	void send(Packet *p, Handler *h);
 
 	void waitHandler(void);
 	void sendHandler(void);
 	void recvHandler(void);
+	void send_from_queue(); //IMplements a send-queue in the Mac layer. Replaces the send function
 	double txtime(Packet *p);
+	double jitter_max_us;
 
 
 private:
 	Packet *	pktRx_;
 	Packet *	pktTx_;
+	PacketQueue* send_queue;
 	
 	// Node role should probably be implemented somewhere else.
-	int		 	node_role;			// To enable nodes that are purely advertising and does not listen to the channel
     MacState        rx_state_;      // incoming state (MAC_RECV or MAC_IDLE)
 	MacState        tx_state_;      // outgoing state
     int             tx_active_;
@@ -39,6 +42,7 @@ private:
 	MacSimpleMeshSendTimer *sendTimer;
 	MacSimpleMeshRecvTimer *recvTimer;
 	int busy_ ;
+	//int bandwidth;
 };
 
 // The Timer class is more or less copied from mac-simple.cc 
