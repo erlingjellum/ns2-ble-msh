@@ -5,6 +5,8 @@
 #include "ip.h"
 #include "mac.h"
 #include "mac-simple-mesh.h"
+#include "ll.h"
+#include "dumb-agent.h"
 #include <cmath>
 #include <string> 
 
@@ -24,7 +26,7 @@ BleMeshAdvAgent::BleMeshAdvAgent(int argc, const char*const* argv): Agent(PT_MES
 
     //TODO: packets received and cache size should not be bound but should rather have getters to
     // return them. Changing them from the TCL scripts makes no sense
-    bind("clockDrift_ppm_", &clockDrift_ppm);
+    //bind("clockDrift_ppm_", &clockDrift_ppm);
     bind("packetSize_", &size_);
     bind("jitterMax_us_", &jitterMax_us);
     bind("packets_received_", &packets_received);
@@ -33,6 +35,9 @@ BleMeshAdvAgent::BleMeshAdvAgent(int argc, const char*const* argv): Agent(PT_MES
     bind("node_id_", &node_id);
     bind("relay_", &relay);
     
+
+    cache_misses = 0;
+    duplicates_received = 0;
 
     int simple_hash = atoi(argv[0]+2);
     srand(time(NULL)+simple_hash);
@@ -55,7 +60,7 @@ void BleMeshAdvAgent::relaymsg(Packet* p) {
 
     HDR_IP(pkt)->ttl_--; // Decrement the ttl
     HDR_CMN(pkt)->direction_ = hdr_cmn::DOWN; //Change the packet direction, we wanna send it DOWN again
-   
+    HDR_CMN(pkt)->iface_ = -1; //This means that its a relay msg
     if(DEBUG) {
         printf("Agent%s scheduling relay, packet_%u\n",name_, HDR_CMN(pkt)->uid());
 
@@ -71,6 +76,7 @@ void BleMeshAdvAgent::sendmsg(int uid, const char *flags){
     //TODO Verify that the input parameters are correct
     HDR_CMN(p)->size() = size_;
     HDR_CMN(p)->uid() = uid;
+    HDR_CMN(p)->iface_ = node_id;
     HDR_IP(p)->ttl() = ttl;
     HDR_IP(p)->dst().addr_ = MAC_BROADCAST;
     HDR_IP(p)->src().addr_ = node_id;
@@ -80,23 +86,25 @@ void BleMeshAdvAgent::sendmsg(int uid, const char *flags){
     HDR_IP(p)->dst().port_ = 42;
 
    
-    SimpleJitterTimer* jitterTimer = new SimpleJitterTimer(this, p);
+    //SimpleJitterTimer* jitterTimer = new SimpleJitterTimer(this, p);
     
     // Account for clock-drift
-    double clockDrift_offset = Scheduler::instance().clock() * clockDrift_ppm / 1000000;
+    //double clockDrift_offset = Scheduler::instance().clock() * clockDrift_ppm / 1000000;
 
 
     //Add this packet to the received packet buffer, so that we will not relay it
     // when we receive the relayed version back
-    recvd_pkts_buffer->push(uid);
+    //recvd_pkts_buffer->push(uid);
     node_cache->push(uid);
 
     if(DEBUG) {
         
         printf("Agent%s scheduling packet,t=%f, %u\n",name_, Scheduler::instance().clock(), HDR_CMN(p)->uid());
-        printf("CLOCK DRIFT = %f\n", clockDrift_offset);
+        //printf("CLOCK DRIFT = %f\n", clockDrift_offset);
     }
-    jitterTimer->start(clockDrift_offset);
+    sendmsg(p);
+
+    //jitterTimer->start(clockDrift_offset);
 
 }
 
@@ -134,6 +142,14 @@ void BleMeshAdvAgent::recv(Packet* pkt, Handler*) {
             recvd_pkts_buffer->push(HDR_CMN(pkt)->uid_);
             recvd_pkts_stats->add(pkt);
 
+        } else {
+            if (DEBUG) {
+                printf("CACHE MISS !!!!!!!!!!\n");
+            }
+
+            duplicates_received++;
+            
+            cache_misses++;
         }
 
         if ((HDR_IP(pkt)->ttl()) > 0 && relay) {
@@ -145,6 +161,7 @@ void BleMeshAdvAgent::recv(Packet* pkt, Handler*) {
             double local_time = Scheduler::instance().clock();
             printf("Agent%s recv OLD packet_%u,t=%f, ttl=%u\n", name_, HDR_CMN(pkt)->uid(),local_time, HDR_IP(pkt)->ttl());
         }
+        duplicates_received++;
 
     }
 
@@ -156,11 +173,38 @@ void BleMeshAdvAgent::recv(Packet* pkt, Handler*) {
 
 
 int BleMeshAdvAgent::command(int argc, const char*const* argv) {
+    if (argc == 2) {
+        if (strcmp(argv[1], "start-adv") == 0) {
+            // This command will start off the advertisment interval clock in the MAC layer
+            // uid = -1 => this is checked in MAC.recv and triggers the advertisement to begin
+            sendmsg(-1,0);
+            return TCL_OK;
+        }
+    }
+
     if (argc == 3) { // Send an advertisement message
-        if (strcmp(argv[1], "send-adv") == 0) {
+        if (strcmp(argv[1], "schedule-adv") == 0) {
             sendmsg(atoi(argv[2]),0);
             return TCL_OK;
         }
+
+        if (strcmp(argv[1], "get") == 0) {
+            Tcl& tcl = Tcl::instance();
+
+            if (strcmp(argv[2], "cache-misses") == 0) {
+                tcl.resultf("%d", cache_misses);
+                return TCL_OK;    
+            }
+
+            if (strcmp(argv[2], "duplicates-received") == 0) {
+                tcl.resultf("%d", duplicates_received);
+                return TCL_OK;
+            }
+            
+        }
+
+        
+        
         
     } else if (argc == 4) {
         if (strcmp(argv[1], "sett") == 0) {
@@ -182,11 +226,12 @@ int BleMeshAdvAgent::command(int argc, const char*const* argv) {
         }
 
         if (strcmp(argv[1], "get") == 0) {
+            Tcl& tcl = Tcl::instance();
             if (strcmp(argv[2], "packets-received-from-node") == 0) {
-                Tcl& tcl = Tcl::instance();
                 tcl.resultf("%d",recvd_pkts_stats->get(atoi(argv[3])));
                 return TCL_OK;
             }
+
         }
     }
 
@@ -204,7 +249,7 @@ The Handle function calls the "sendmsg(Packet* p)" routine from the agent and th
 the packet downstream. The object then delets itself.
 
 
-*/
+
 
 void SimpleJitterTimer::start(double jitter) {
     assert(jitter >= 0);
@@ -222,7 +267,7 @@ void SimpleJitterTimer::handle(Event* e) {
 
 
 
-
+*/
 
 void CircularContainer::push(int element) {
     if (size_ < max_size_) {

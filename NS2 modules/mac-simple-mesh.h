@@ -1,48 +1,72 @@
 
-/* This class is based of the Mac Simple class */
+/* This is the first try in implementing BTLE Mesh in NS2 */
 
 #ifndef ns_mac_simple_mesh_h
 #define ns_mac_simple_mesh_h
 
-#include "mac-simple.h"
+//#include "mac-simple.h"
 #include "queue.h"
+#include <list>
+#include "timer-handler.h"
 
 class MacSimpleMeshWaitTimer;
 class MacSimpleMeshSendTimer;
 class MacSimpleMeshRecvTimer;
+class MacSimpleMeshAdvertiseTimer;
+class MacSimpleMeshRXDeadTimer;
+class SimplePowerMonitor;
 
 // enum Role {ADV_RECV = 1, ADV_ONLY = 2, RECV_ONLY = 3};
 
 class MacSimpleMesh : public Mac {
-
 public:
 	MacSimpleMesh(int argc, const char*const* argv);
+
+	int command(int argc, const char*const* argv);
+
 	void recv(Packet *p, Handler *h);
-	void send(Packet *p, Handler *h);
+
+	void advertise(); // In BTLE Mesh this is called at each advertise interval. It will then send the first packet in the queue
 
 	void waitHandler(void);
 	void sendHandler(void);
 	void recvHandler(void);
-	void send_from_queue(); //IMplements a send-queue in the Mac layer. Replaces the send function
+	void deadTimeHandler(void);
 	double txtime(Packet *p);
 	double jitter_max_us;
+	PacketQueue* send_queue; //The packet queue for transmissions
 
 
 private:
 	Packet *	pktRx_;
 	Packet *	pktTx_;
-	PacketQueue* send_queue;
+	
+	double		adv_interval_us; // The interval between transmission for this node
+	int			retransmissions; // Number of retransmissions per packet
+	int			adv_roles;		// Max number of advertisements per adv_interval
+	double		dead_time_us;
+
+	// Stats
+	int 		col_crc;
+	int			col_ccrejection;
+	int			col_dead;
+	int			relays;
+
+	SimplePowerMonitor* powerMonitor;
 	
 	// Node role should probably be implemented somewhere else.
     MacState        rx_state_;      // incoming state (MAC_RECV or MAC_IDLE)
 	MacState        tx_state_;      // outgoing state
     int             tx_active_;
+	bool			advertise_waiting_;	// state variable. Is set if a RX is postponing th TX slot.
 	Handler * 	txHandler_;
 	MacSimpleMeshWaitTimer *waitTimer;
 	MacSimpleMeshSendTimer *sendTimer;
 	MacSimpleMeshRecvTimer *recvTimer;
+	MacSimpleMeshAdvertiseTimer *advTimer;
+	MacSimpleMeshRXDeadTimer *deadTimer;
 	int busy_ ;
-	//int bandwidth;
+	double bandwidth;
 };
 
 // The Timer class is more or less copied from mac-simple.cc 
@@ -91,6 +115,44 @@ class MacSimpleMeshRecvTimer: public MacSimpleMeshTimer {
 public:
 	MacSimpleMeshRecvTimer(MacSimpleMesh *m) : MacSimpleMeshTimer(m) {}
 	void handle(Event *e);
+};
+
+// Timer used for scheduling advertisement
+class MacSimpleMeshAdvertiseTimer: public MacSimpleMeshTimer {
+public:
+	MacSimpleMeshAdvertiseTimer(MacSimpleMesh *m) : MacSimpleMeshTimer(m) {}
+	void handle(Event *e);
+};
+
+// Timer used for receiver dead time after packet RX
+
+class MacSimpleMeshRXDeadTimer: public MacSimpleMeshTimer {
+public:
+	MacSimpleMeshRXDeadTimer(MacSimpleMesh *m) : MacSimpleMeshTimer(m) {}
+	void handle(Event *e);
+};
+
+
+// SimplePowerMonitor to store the noise on the radio channel while the MAC is TXing or in DEAD mode.
+struct interf {
+      double Pt;
+      double end;
+};
+
+
+class SimplePowerMonitor: public TimerHandler {
+public:
+	SimplePowerMonitor(MacSimpleMesh *m): mac(m), powerLevel(-1) {}
+	void recordPowerLevel(double power, double duration);
+	double getPowerLevel();
+	virtual void expire(Event *);
+
+private:
+	MacSimpleMesh* mac;
+	PacketQueue* packets;
+	double powerLevel;
+	list<interf> interfList;
+	
 };
 
 
