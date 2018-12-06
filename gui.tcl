@@ -237,7 +237,8 @@ proc update_mode {name1 nam2 op} {
 }
 
 proc open_about_window {} {
-    toplevel .a VERSION
+    global VERSION
+    toplevel .a
     wm title .a "About"
     label .a.text -font myFont -text "BLE Mesh Simulator\nVersion $VERSION\nCopyright 2018 Nordic Semiconductor ASA\nSimulates a grid of BLE nodes running the BLE Mesh protocol with NS2" 
 
@@ -453,7 +454,7 @@ proc display_results {res} {
 
     toplevel .f
     wm title .f "Simulation Results"
-    tk::listbox .f.text -font myFont -yscrollcommand ".f.scroll set" -height 50 -width 100
+    tk::listbox .f.text -font myFont -yscrollcommand ".f.scroll set" -height 40 -width 100
     #Make a scrollbar
     scrollbar .f.scroll -command ".f.text yview" -orient vertical 
 
@@ -477,7 +478,7 @@ proc display_results {res} {
         .f.text insert end "Packets received = [lindex $node_res 1]/[expr $param(n_packets)*($param(num_nodes_x)*$param(num_nodes_y)-1)]"
         .f.text insert end "Throughput =  [expr [lindex $node_res 1]*$param(packet_payload_size)*8/($param(tot_time)*1000)] kbps\n"
         .f.text insert end "Duplicates received = [lindex $node_res 2]"
-        .f.text insert end "CRC-Collision = [lindex $node_res 5] Co-Channel-Rejections = [lindex $node_res 6] Dead-Time-Collisions: [lindex $node_res 7]"
+        .f.text insert end "CRC-Collision = [lindex $node_res 6] Co-Channel-Rejections = [lindex $node_res 7] Dead-Time-Collisions: [lindex $node_res 8]"
        
        # Extract results for all other nodes
         for {set i 0} {$i < $param(num_nodes_y)} {incr i} {
@@ -491,7 +492,7 @@ proc display_results {res} {
                     .f.text insert end  "Packet queue length at the end of simulation =  [lindex $node_res 3]"
                     .f.text insert end  "Relayed packets = [lindex $node_res 4] Cache-misses = [lindex $node_res 5]"
                     .f.text insert end  "Duplicates received = [lindex $node_res 2]"
-                    .f.text insert end  "CRC-Collision = [lindex $node_res 5] Co-Channel-Rejections = [lindex $node_res 6] Dead-Time-Collisions: [lindex $node_res 7]"    
+                    .f.text insert end  "CRC-Collision = [lindex $node_res 6] Co-Channel-Rejections = [lindex $node_res 7] Dead-Time-Collisions: [lindex $node_res 8]"    
                 }
                 
             }
@@ -536,6 +537,7 @@ proc display_results {res} {
 }
 
 proc save_results {textbox} {
+    global param
     set i 0
     $textbox insert $i "SIMULATION PARAMETERS:"
     $textbox insert [incr i] "Simulation Mode = $param(mode)"

@@ -246,23 +246,23 @@ proc run_ns {gui_on} {
         for {set i 0} {$i < $param(num_nodes)} {incr i} {
             set mac [$n($i) set mac_(0)]
             set resultPerNode {}
-            # 1 Packets successfully received at gateway
+            # 0 Packets successfully received at gateway
             lappend resultPerNode [$a($param(master_index)) get packets-received-from-node $i]
-            # 2 Packets received at this node
+            # 1 Packets received at this node
             lappend resultPerNode [$a($i) set packets_received_]
-            # 3 Duplicates received at this node
+            # 2 Duplicates received at this node
             lappend resultPerNode [$a($i) get duplicates-received]
-            # 4 Packet queue at end of sim
+            # 3 Packet queue at end of sim
             lappend resultPerNode [$mac get send-queue]
-            # 5 Number of relayed packet by node
+            # 4 Number of relayed packet by node
             lappend resultPerNode [$mac get relays]
-            # 6 Number of cache-misses
+            # 5 Number of cache-misses
             lappend resultPerNode [$a($i) get cache-misses]
-            # 7 CRC collision
+            # 6 CRC collision
             lappend resultPerNode [$mac get crc-collisions]
-            # 8 Co-Channel rejections
+            # 7 Co-Channel rejections
             lappend resultPerNode [$mac get co-channel-rejections]
-            # 9 Dead-Time-Collisions
+            # 8 Dead-Time-Collisions
             lappend resultPerNode [$mac get dead-time-collisions]
 
             # Append the results for this node to the RES variable

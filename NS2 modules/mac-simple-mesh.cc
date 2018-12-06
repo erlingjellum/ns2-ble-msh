@@ -25,13 +25,13 @@ MacSimpleMesh::MacSimpleMesh(int argc, const char* const* argv) : Mac() {
 	advertise_waiting_ = false;
 
 	send_queue = new PacketQueue();
-    waitTimer = new MacSimpleMeshWaitTimer(this);
-    sendTimer = new MacSimpleMeshSendTimer(this);
-    recvTimer = new MacSimpleMeshRecvTimer(this);
+    	waitTimer = new MacSimpleMeshWaitTimer(this);
+    	sendTimer = new MacSimpleMeshSendTimer(this);
+    	recvTimer = new MacSimpleMeshRecvTimer(this);
 	advTimer = new MacSimpleMeshAdvertiseTimer(this);
 	deadTimer = new MacSimpleMeshRXDeadTimer(this);
 	powerMonitor = new SimplePowerMonitor(this);
-    busy_ = 0;
+    	busy_ = 0;
 	relays = 0;
 	col_dead = 0;
 	col_ccrejection = 0;
@@ -143,7 +143,7 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 		}
 		// Update the power monitor
 		powerMonitor->recordPowerLevel(p->txinfo_.RxPr, txtime(p));
-		col_ccrejection++;
+		col_dead++;
 		Packet::free(p);
 		return;
 	}
@@ -174,6 +174,7 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 				}
 				powerMonitor->recordPowerLevel(p->txinfo_.RxPr, txtime(p));
 				col_dead++;
+				Packet::free(p);
 				return;
 			}
 		}
@@ -208,6 +209,7 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 		 * We are receiving a different packet, so decide whether
 		 * the new packet's power is high enough to notice it.
 		 */
+		printf("pktRX_:%f p:%f CPThresh:%f", pktRx_->txinfo_.RxPr,p->txinfo_.RxPr,p->txinfo_.CPThresh);
 
 		if (pktRx_->txinfo_.RxPr / p->txinfo_.RxPr
 			>= p->txinfo_.CPThresh) {
