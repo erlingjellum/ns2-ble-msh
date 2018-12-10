@@ -6,7 +6,7 @@
 #include <time.h>
 
 
-const bool DEBUG = false;
+const bool DEBUG = true;
 
 //Binding the c++ class til otcl
 static class MacSimpleMeshClass : public TclClass {
@@ -25,13 +25,13 @@ MacSimpleMesh::MacSimpleMesh(int argc, const char* const* argv) : Mac() {
 	advertise_waiting_ = false;
 
 	send_queue = new PacketQueue();
-    	waitTimer = new MacSimpleMeshWaitTimer(this);
-    	sendTimer = new MacSimpleMeshSendTimer(this);
-    	recvTimer = new MacSimpleMeshRecvTimer(this);
+    waitTimer = new MacSimpleMeshWaitTimer(this);
+    sendTimer = new MacSimpleMeshSendTimer(this);
+    recvTimer = new MacSimpleMeshRecvTimer(this);
 	advTimer = new MacSimpleMeshAdvertiseTimer(this);
 	deadTimer = new MacSimpleMeshRXDeadTimer(this);
 	powerMonitor = new SimplePowerMonitor(this);
-    	busy_ = 0;
+    busy_ = 0;
 	relays = 0;
 	col_dead = 0;
 	col_ccrejection = 0;
@@ -44,6 +44,9 @@ MacSimpleMesh::MacSimpleMesh(int argc, const char* const* argv) : Mac() {
 	bind("adv_roles_", &adv_roles);
 	bind("dead_time_us_", &dead_time_us);
 	bind("bandwidth_", &bandwidth);
+
+	adv_roles_left = adv_roles;
+
 
 }
 
@@ -143,7 +146,7 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 		}
 		// Update the power monitor
 		powerMonitor->recordPowerLevel(p->txinfo_.RxPr, txtime(p));
-		col_dead++;
+		col_ccrejection++;
 		Packet::free(p);
 		return;
 	}
@@ -167,7 +170,7 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 		// Check the powerMonitor
 		
 		// Check if we are too close to our TX window to accept it
-		if(advTimer->busy()) {
+		if(send_queue->length()) {
 			if((txtime(p) + (dead_time_us/1e6))>(advTimer->expire())) {
 				if (DEBUG) {
 					printf("MAC_%s dropped incoming packet because too close to TX window\n", name_);
@@ -185,6 +188,7 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 				powerMonitor->recordPowerLevel(p->txinfo_.RxPr, txtime(p));
 				printf("**********************Power monitor works: %.10f********************************\n", powerLevel);
 				col_ccrejection++;
+				Packet::free(p);
 				return;
 			}
 		
@@ -197,8 +201,8 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 		recvTimer->start(txtime(p));
 
 		if (DEBUG) {
-			printf("MAC_%s receiving, p_%d\n", name_, HDR_CMN(pktRx_)->uid());
-			printf("PM = %.8f, p_%d = %.8f\n", powerMonitor->getPowerLevel(), HDR_CMN(pktRx_)->uid(), pktRx_->txinfo_.RxPr);
+			//printf("MAC_%s receiving, p_%d\n", name_, HDR_CMN(pktRx_)->uid());
+			//printf("PM = %.8f, p_%d = %.8f\n", powerMonitor->getPowerLevel(), HDR_CMN(pktRx_)->uid(), pktRx_->txinfo_.RxPr);
 			
 		}
 
@@ -209,7 +213,6 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 		 * We are receiving a different packet, so decide whether
 		 * the new packet's power is high enough to notice it.
 		 */
-		printf("pktRX_:%f p:%f CPThresh:%f", pktRx_->txinfo_.RxPr,p->txinfo_.RxPr,p->txinfo_.CPThresh);
 
 		if (pktRx_->txinfo_.RxPr / p->txinfo_.RxPr
 			>= p->txinfo_.CPThresh) {
@@ -250,22 +253,24 @@ void MacSimpleMesh::recv(Packet *p, Handler *h){
 
 void MacSimpleMesh::advertise() {
 	// This will be called at each advertise interval and will send the first packet in the queue.
-	if(tx_state_ != MAC_IDLE) {
-		printf("TX IS BUSY when calling advertise! %d\n", int (tx_state_));
-		advertise_waiting_ = true; //It is DEAD after a receive
-		return;
-	}
 	
-	if(rx_state_ == MAC_RECV) {
-		// Assume we have RX priority then postpone the TX slot until after
-		// we have finished receiving this packet
-		printf("A RX is postponing the advertisement slot\n");
-		advertise_waiting_ = true;
-		return;
-	}
-
 	if (send_queue->length()) {
 		// If we have some packets in the queue send them
+
+		if(tx_state_ != MAC_IDLE) {
+			printf("TX IS BUSY when calling advertise! %d\n", int (tx_state_));
+			advertise_waiting_ = true; //It is DEAD after a receive
+			return;
+		}
+	
+		if(rx_state_ == MAC_RECV) {
+			// Assume we have RX priority then postpone the TX slot until after
+			// we have finished receiving this packet
+			printf("A RX is postponing the advertisement slot\n");
+			advertise_waiting_ = true;
+			return;
+		
+		}
 
 
 		if (DEBUG) {
@@ -286,6 +291,9 @@ void MacSimpleMesh::advertise() {
 		if (ch->iface_ == -1) {
 			relays++;
 		}
+
+		adv_roles_left--;
+
 		sendTimer->restart(ch->txtime_);
 		waitHandler(); //Starts packet transmission this function should be renamed
 		// Schedule the finishing of packet transmission
@@ -297,6 +305,7 @@ void MacSimpleMesh::advertise() {
 	double jitter_us = ((double) rand() / RAND_MAX)*jitter_max_us;
 	//printf("jitter = %f\n", jitter_us);
 	advTimer->restart((adv_interval_us + jitter_us)/1000000);
+	adv_roles_left = adv_roles;
 
 }
 
@@ -333,7 +342,7 @@ void MacSimpleMesh::recvHandler() {
 
     else if (state == MAC_COLL) {
         // Recv collision
-		//printf("MAC%s dropped incoming package_%u due to receive collision\n", name_, HDR_CMN(p)->uid());
+		printf("MAC%s dropped incoming package_%u due to receive collision\n", name_, HDR_CMN(p)->uid());
         drop(p, DROP_MAC_COLLISION);
     }
 
@@ -345,7 +354,8 @@ void MacSimpleMesh::recvHandler() {
     else if(ch->error()) {
         // Packet arrived with errors
         // Check that collisions don't result in this
-		//printf("MAC%s dropped incoming package_%u due to packet-errors\n", name_, HDR_CMN(p)->uid());
+		col_crc++; //Update it also here, then col_crc will be ALL packets that collided (both received and not)
+		printf("MAC%s dropped incoming package_%u due to packet-errors\n", name_, HDR_CMN(p)->uid());
         drop(p, DROP_MAC_PACKET_ERROR);
     }
     else {
@@ -390,10 +400,21 @@ void MacSimpleMesh::sendHandler() {
 		double local_time = Scheduler::instance().clock();
 		printf("MAC_%s finished sending p_%d, t=%f, queue=%d\n", name_, HDR_CMN(pktTx_)->uid(),local_time, send_queue->length());
 	}
+
 	pktTx_ = 0;
 	txHandler_ = 0;
 	tx_state_ = MAC_IDLE;
 	tx_active_ = 0;
+
+	if(adv_roles_left) {
+		// If we have more packets left to send this adv window
+		advertise();
+	}
+
+	else {
+		// We have sent all packets to be sent this adv window
+		adv_roles_left = adv_roles;
+	}
 
 	// I have to let the guy above me know I'm done with the packet
 	//h->handle(p); // ERLING: Seems unneccesary

@@ -24,7 +24,7 @@ proc read_params_from_file {fname} {
     set param(show_nam) [lindex $param_line [incr i]]
     set param(node_type) [lindex $param_line [incr i]]
 
-    set param(adv_roles) 1
+    
     set param(retransmissions) 1
     set param(priority) "Original Packets"
     set param(allow_rx_postpone) "No"
@@ -33,6 +33,7 @@ proc read_params_from_file {fname} {
     set param(packet_payload_size) [lindex $param_line [incr i]]
     set param(traffic_interval_ms) [lindex $param_line [incr i]]
     set param(dead_time_us) [lindex $param_line [incr i]]
+    set param(adv_roles) [lindex $param_line [incr i]]
     set param(node_relay) [split [lindex $param_line [incr i]] " "]
     set param(traffic_generator) [split [lindex $param_line [incr i]] " "]
 
@@ -64,7 +65,8 @@ proc write_params_to_file {fname arrName} {
     puts $fp $param(node_cache_size)  
     puts $fp $param(packet_payload_size)
     puts $fp $param(traffic_interval_ms) 
-    puts $fp $param(dead_time_us)     
+    puts $fp $param(dead_time_us)    
+    puts $fp $param(adv_roles) 
 
     for {set index 0} {$index < $param(num_nodes)} {incr index} {
         puts -nonewline $fp [lindex $param(node_relay) $index]

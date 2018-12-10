@@ -1,9 +1,12 @@
-global . gui_progress node_select
+
+global . gui_progress node_select texts
 source ns2.tcl
+source gui-texts.tcl
+source tooltip.tcl
 
 
 proc setup_gui {} {
-    global gui_progress . param node_select myFont FONT_SIZE relay traffic_generator
+    global gui_progress . param node_select myFont FONT_SIZE relay traffic_generator texts
     set gui_progress 0
     set node_list {}
     set node_select             "(0,0)"
@@ -49,107 +52,129 @@ proc setup_gui {} {
                             -values {"one-to-all" "all-to-one"}\
                             -state readonly
     trace add variable param(mode) write update_mode
+    tooltip::tooltip .mode_label $texts(hovertips_mode_label)
+
 
     label .node_env_label -font myFont -text "Node Environment" -justify left
     ttk::combobox .node_env_entry -font myFont -textvariable  param(node_env)\
                                 -values {"Free-space"}\
                                 -state readonly
-
+    tooltip::tooltip .node_env_label $texts(hovertips_node_env_label)
 
     label .show_nam_label -font myFont -text "Show graphic visualization" -justify left
     ttk::combobox .show_nam_entry -font myFont -textvariable  param(show_nam)\
                                     -state readonly\
                                     -values {"Yes" "No"}
+    tooltip::tooltip .show_nam_label $texts(hovertips_show_nam_label)
 
     label .num_nodes_x_label -font myFont -text "Node grid size x \[\]" -justify left
     entry .num_nodes_x_entry  -font myFont -textvariable  param(num_nodes_x)
     trace add variable param(num_nodes_x) write update_node_list
+    tooltip::tooltip .num_nodes_x_label $texts(hovertips_num_nodes_x_label)
 
     label .num_nodes_y_label -font myFont -text "Node grid size y \[\]" -justify left
     entry .num_nodes_y_entry -font myFont -textvariable  param(num_nodes_y)
     trace add variable param(num_nodes_y) write update_node_list
+    tooltip::tooltip .num_nodes_y_label $texts(hovertips_num_nodes_y_label)
 
     label .spacing_label -font myFont -text "Distance between nodes \[m\]" -justify left
     entry .spacing_entry -font myFont -textvariable  param(spacing_m)
-
+    tooltip::tooltip .spacing_label $texts(hovertips_spacing_label)
 
 
     label .traffic_interval_label -font myFont -text "Traffic Generation Interval \[ms\]" -justify left
     entry .traffic_interval_entry -font myFont -textvariable  param(traffic_interval_ms) -justify left
+    tooltip::tooltip .traffic_interval_label $texts(hovertips_traffic_interval_label)
 
     label .txp_label -font myFont -text "Advertisment Interval \[ms\]"
     entry .txp_entry -font myFont -textvariable  param(advertisement_interval_ms)
+    tooltip::tooltip .txp_label $texts(hovertips_txp_label)
 
     label .n_packets_label -font myFont -text "Number of packets sent per node \[\]"
     entry .n_packets_entry -font myFont -textvariable  param(n_packets)
+    tooltip::tooltip .n_packets_label $texts(hovertips_n_packets_label)
 
     label .packet_size_label -font myFont -text "Payload size \[Bytes\]" -justify left
     entry .packet_size_entry -font myFont -textvariable  param(packet_payload_size)
+    tooltip::tooltip .packet_size_label $texts(hovertips_packet_size_label)
 
     label .jitter_max_label -font myFont -text "Max jitter \[ms\]" -justify left
     entry .jitter_max_entry -font myFont -textvariable  param(jitterMax_ms)
-
+    tooltip::tooltip .jitter_max_label $texts(hovertips_jitter_max_label)
 
 
     label .node_type_label -font myFont -text "Node IC" -justify left
     ttk::combobox .node_type_entry -font myFont -textvariable  param(node_type)\
                                     -state readonly\
                                     -values {"nRF52"}
+    tooltip::tooltip .node_type_label $texts(hovertips_node_type_label)                                
 
     label .tx_power_label -font myFont -text "TX power" -justify left
     ttk::combobox .tx_power_entry -font myFont -textvariable  param(TX_power)\
                                     -state readonly\
                                     -values {"-4dBm" "0dBm" "+4dBm"}
+    tooltip::tooltip .tx_power_label $texts(hovertips_tx_power_label)
 
     label .bw_label -font myFont -text "Bandwidth" -justify left
     ttk::combobox .bw_entry -font myFont -textvariable  param(bandwidth)\
                             -state readonly\
                             -values {125kb 250kb 1Mb 2Mb}
+    tooltip::tooltip .bw_label $texts(hovertips_bw_label)
 
     label .ttl_label -font myFont -text "TTL \[\]"
     entry .ttl_entry -font myFont -textvariable  param(ttl)
-
+    tooltip::tooltip .ttl_label $texts(hovertips_ttl_label)
+    
     label .node_cache_size_label -font myFont -text "Cache size \[n packets\]" -justify left
     entry .node_cache_size_entry -font myFont -textvariable  param(node_cache_size)
+    tooltip::tooltip .node_cache_size_label $texts(hovertips_node_cache_size_label)
 
 
     label .rx_dead_time_label -font myFont -text "Radio Dead-time after receive \[us\]" -justify left
     entry .rx_dead_time_entry -font myFont -textvariable  param(dead_time_us) -justify left
+    tooltip::tooltip .rx_dead_time_label $texts(hovertips_rx_dead_time_label)
 
     label .clock_drift_label -font myFont -text "Clock Drift \[ppm\]"
     entry .clock_drift_entry -font myFont -textvariable  param(clock_drift) -state readonly
+    tooltip::tooltip .clock_drift_label $texts(hovertips_clock_drift_label)
+
+
+    label .adv_roles_label -font myFont -text "Advertisement Roles"
+    entry .adv_roles_entry -font myFont -textvariable  param(adv_roles)
+    tooltip::tooltip .adv_roles_label $texts(hovertips_adv_roles_label)
 
     label .retransmissions_label -font myFont -text "Retransmissions"
     entry .retransmissions_entry -font myFont -textvariable  param(retransmissions) -state readonly
-
-    label .adv_roles_label -font myFont -text "Advertisement Roles"
-    entry .adv_roles_entry -font myFont -textvariable  param(adv_roles) -state readonly
+    tooltip::tooltip .retransmissions_label $texts(hovertips_retransmissions_label)
 
     label .priority_label -font myFont -text "Priority"
     entry .priority_entry -font myFont -textvariable  param(priority) -state readonly
+    tooltip::tooltip .priority_label $texts(hovertips_priority_label)
 
     label .allow_rx_postpone_label -font myFont -text "Allow RX to postpone Advertisement Window"
     entry .allow_rx_postpone_entry -font myFont -textvariable  param(allow_rx_postpone) -state readonly
-
+    tooltip::tooltip .allow_rx_postpone_label $texts(hovertips_allow_rx_postpone_label)
 
     label .node_select_label -font myFont -text "Node" -justify left
     ttk::combobox .node_select_entry -font myFont -textvariable  node_select\
                                     -values $node_list\
                                     -state readonly
     trace add variable node_select write update_node_options
-
+    tooltip::tooltip .node_select_label $texts(hovertips_node_select_label)
 
     label .node_master_label -font myFont -text "Master" -justify left
     checkbutton .node_master_button -command update_master
+    tooltip::tooltip .node_master_label $texts(hovertips_node_master_label)
 
     label .traffic_generator_label -font myFont -text "Traffic Generator"
     checkbutton .traffic_generator_button -variable traffic_generator
     trace add variable traffic_generator write update_traffic_generators
+    tooltip::tooltip .traffic_generator_label $texts(hovertips_traffic_generator_label)
 
     label .node_relay_label -font myFont -text "Relay" -justify left
     checkbutton .node_relay_button -variable relay
     trace add variable relay write update_node_relay
-
+    tooltip::tooltip .node_relay_label $texts(hovertips_node_relay_label)
 
     button .start_button -font myFont -text "Start" -command "run_simulation" 
 
@@ -354,11 +379,11 @@ proc run_gui {} {
     grid .rx_dead_time_label -row [incr i] -column 0
     grid .rx_dead_time_entry -row $i -column 1
 
-    grid .retransmissions_label -row [incr i] -column 0
-    grid .retransmissions_entry -row $i -column 1
-
     grid .adv_roles_label -row [incr i] -column 0
     grid .adv_roles_entry -row $i -column 1
+
+    grid .retransmissions_label -row [incr i] -column 0
+    grid .retransmissions_entry -row $i -column 1    
 
     grid .priority_label -row [incr i] -column 0
     grid .priority_entry -row $i -column 1

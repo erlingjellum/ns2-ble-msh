@@ -44,6 +44,7 @@ private:
 	double		adv_interval_us; // The interval between transmission for this node
 	int			retransmissions; // Number of retransmissions per packet
 	int			adv_roles;		// Max number of advertisements per adv_interval
+	int			adv_roles_left; // To control the number of adv packets sent per adv window
 	double		dead_time_us;
 
 	// Stats
