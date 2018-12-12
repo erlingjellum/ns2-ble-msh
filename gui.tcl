@@ -522,7 +522,7 @@ proc display_results {res} {
 
     toplevel .f
     wm title .f "Simulation Results"
-    tk::listbox .f.text -font myFont -yscrollcommand ".f.scroll set" -height 50 -width 100
+    tk::listbox .f.text -font myFont -yscrollcommand ".f.scroll set" -height 40 -width 100
     #Make a scrollbar
     scrollbar .f.scroll -command ".f.text yview" -orient vertical
 
@@ -556,7 +556,7 @@ proc display_results {res} {
                 set index [expr ($i*$param(num_nodes_x))+$j]
                 if {$index != $param(master_index)} {
                     set node_res [lindex $res $index]
-                    .f.text insert end "### Node_($j-$i) ###"
+                    .f.text insert end "### Node_($i-$j) ###"
                     .f.text insert end  "Packets successfully received at Gateway = [lindex $node_res 0]/$param(n_packets)"
                     .f.text insert end  "Throughput = [expr [lindex $node_res 0]*$param(packet_payload_size)*8/($param(tot_time)*1000)] kbps"
                     .f.text insert end  "Originator Queue Overflows =  [lindex $node_res 3]"

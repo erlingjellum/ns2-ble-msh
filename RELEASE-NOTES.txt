@@ -14,6 +14,7 @@ Version 0.4 has the following updates
 # Changes in the model
 ReceiverSensitivity is now in accordance with the Product Spec on the different IC.
 Added a PowerMonitor in the PHY layer to record the background noise
+Capture Threshold is set to 20dBm
 New Phy layer = WirelessPhyBTLE
 New Mac layer = Mac/BTLEmesh
 The new layers gives a better encapsulation and more correctly models the BLE Mesh stack. 
