@@ -546,7 +546,7 @@ proc display_results {res} {
                 
             }
         }
-        set node_res [lindex $res $master_index]
+        set node_res [lindex $res $param(master_index)]
         .f.text insert $gateway_index "## Gateway ##"
         .f.text insert [incr gateway_index] "Packets received = $total_packets_recv_from_master/[expr $param(n_packets)*($param(num_nodes_x)*$param(num_nodes_y)-1)]"
         .f.text insert [incr gateway_index] "Throughput =  [expr $total_packets_recv_from_master*$param(packet_payload_size)*8/($param(tot_time)*1000)] kbps\n"

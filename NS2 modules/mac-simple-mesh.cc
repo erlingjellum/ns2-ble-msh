@@ -299,13 +299,12 @@ void MacSimpleMesh::advertise() {
 		// Schedule the finishing of packet transmission
 		
 		
+	} else {
+		// Schedule next advertisement;
+		double jitter_us = ((double) rand() / RAND_MAX)*jitter_max_us;
+		advTimer->restart((adv_interval_us + jitter_us)/1000000);
+		adv_roles_left = adv_roles;
 	}
-
-	// Schedule next advertisement;
-	double jitter_us = ((double) rand() / RAND_MAX)*jitter_max_us;
-	//printf("jitter = %f\n", jitter_us);
-	advTimer->restart((adv_interval_us + jitter_us)/1000000);
-	adv_roles_left = adv_roles;
 
 }
 
@@ -403,18 +402,20 @@ void MacSimpleMesh::sendHandler() {
 
 	pktTx_ = 0;
 	txHandler_ = 0;
-	tx_state_ = MAC_IDLE;
+	tx_state_ = MAC_DEAD;
+	rx_state_ = MAC_DEAD;
 	tx_active_ = 0;
 
-	if(adv_roles_left) {
-		// If we have more packets left to send this adv window
-		advertise();
-	}
-
-	else {
-		// We have sent all packets to be sent this adv window
+	if(adv_roles_left == 0) {
+		// We have finished with all advertisements
+		// Schedule next advertisement;
+		double jitter_us = ((double) rand() / RAND_MAX)*jitter_max_us;
+		advTimer->restart((adv_interval_us + jitter_us)/1000000);
 		adv_roles_left = adv_roles;
 	}
+	
+	//Start the dead timer.
+	deadTimer->restart(dead_time_us/1000000);
 
 	// I have to let the guy above me know I'm done with the packet
 	//h->handle(p); // ERLING: Seems unneccesary
@@ -436,6 +437,11 @@ void MacSimpleMesh::deadTimeHandler() {
 		double jitter_us = ((double) rand() / RAND_MAX)*jitter_max_us;
 		advTimer->restart(jitter_us/1000000);
 	}
+
+	if((adv_roles_left < adv_roles) && (adv_roles_left > 0)) {
+		advertise();
+	}
+
 }
 
 
