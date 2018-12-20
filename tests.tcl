@@ -1,5 +1,8 @@
 source ns2.tcl
 
+# Little hack
+set TRACEFILE_PATH "tracefiles/tracefile.tr"
+
 
 proc test_most_basic {} {
     global param
@@ -17,9 +20,9 @@ proc test_most_basic {} {
     set param(mode)                             all-to-one
     set param(bandwidth)                        1Mb
     set param(TX_power)                         0dBm
-    set param(node_env)                         free-space 
+    set param(node_env)                         "Free-Space"
     set param(show_nam)                         No
-    set param(node_type)                        "nRF52"
+    set param(node_type)                        "nRF52840"
     set param(adv_roles)                        1
     set param(retransmissions)                  1
     set param(priority)                         "Original Packets"
@@ -28,9 +31,12 @@ proc test_most_basic {} {
     set param(packet_payload_size)              11
     
     set param(dead_time_us)                     150
+    set param(ramp_time_us)                     100
     set param(node_relay)                       {0 0 1}
     set param(traffic_generator)                {0 1 1}
 
+    set param(originator_queue_size)            20
+    set param(relay_queue_size)                 15
 
     set res [run_ns false]
 
@@ -83,31 +89,38 @@ proc test_all_packet_accounted_for {} {
     set success 1
     set param(num_nodes_x)                      5
     set param(num_nodes_y)                      5                           
-    set param(spacing_m)                        0.1
+    set param(spacing_m)                        0.01
     set param(master_index)                     0
     set param(jitterMax_ms)                     10
-    set param(advertisement_interval_ms)        10
-    set param(traffic_interval_ms)              1000   
+    set param(advertisement_interval_ms)        20
+    set param(traffic_interval_ms)              100   
     set param(clock_drift)                      0
     set param(ttl)                              10
     set param(n_packets)                        100
     set param(mode)                             all-to-one
     set param(bandwidth)                        1Mb
     set param(TX_power)                         0dBm
-    set param(node_env)                         free-space 
+    set param(node_env)                         Free-Space
     set param(show_nam)                         No
-    set param(node_type)                        "nRF52"
+    set param(node_type)                        "nRF528240"
     set param(adv_roles)                        2
     set param(retransmissions)                  1
-    set param(priority)                         "Original Packets"
+    set param(priority)                         "Originator Packets"
     set param(allow_rx_postpone)                "No"
     set param(node_cache_size)                  50
     set param(packet_payload_size)              11
+
+
+    set param(originator_queue_size)            20
+    set param(relay_queue_size)                 15
     
     set param(dead_time_us)                     150
     set param(node_relay)                       {0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1}
     set param(traffic_generator)                {0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1}
 
+    set param(ramp_time_us)                     100
+    set param(originator_queue_size)            20
+    set param(relay_queue_size)                 15
 
     set res [run_ns false]
 
@@ -116,22 +129,26 @@ proc test_all_packet_accounted_for {} {
     set tot_ccr 0
     set tot_recv 0
     set tot_relays 0
+    set tot_tx 0
+    set tot_ramp 0
 
     for {set i 0} {$i < $param(num_nodes)} {incr i} {
         set n [lindex $res $i]
-        set tot_recv    [expr $tot_recv + [lindex $n 1] + [lindex $n 2]]
-        set tot_relays  [expr $tot_relays + [lindex $n 4]]
-        set tot_crc     [expr $tot_crc + [lindex $n 6]]
-        set tot_dead    [expr $tot_dead + [lindex $n 8]]
-        set tot_ccr     [expr $tot_ccr + [lindex $n 7]]
+        set tot_recv    [expr $tot_recv + [lindex $n 1] +[lindex $n 2]]
+        set tot_relays  [expr $tot_relays + [lindex $n 5]]
+        set tot_crc     [expr $tot_crc + [lindex $n 7]]
+        set tot_dead    [expr $tot_dead + [lindex $n 9]]
+        set tot_ccr     [expr $tot_ccr + [lindex $n 8]]
+        set tot_ramp    [expr $tot_ramp + [lindex $n 11]]
+        set tot_tx      [expr $tot_tx + [lindex $n 10]]
     }
 
     set tot_sent [expr (($param(num_nodes)-1)*$param(n_packets) + $tot_relays)*($param(num_nodes)-1)]
 
-    if {$tot_sent != [expr $tot_recv + $tot_crc + $tot_ccr + $tot_dead]} {
+    if {$tot_sent < [expr $tot_recv + $tot_crc + $tot_ccr + $tot_dead + $tot_tx + $tot_ramp]} {
         puts "Not all packets accounted for!"
-        puts "Total Sent: $tot_sent \nTotal Relay: $tot_relays\nTotal Recv: $tot_recv\nTotal CRC: $tot_crc\n Total CCR: $tot_ccr\n Total Dead: $tot_dead"
-        puts "TOTAL RECV = [expr $tot_recv + $tot_crc + $tot_ccr + $tot_dead]"
+        puts "Total Sent: $tot_sent \nTotal Relay: $tot_relays\nTotal Recv: $tot_recv\nTotal CRC: $tot_crc\n Total CCR: $tot_ccr\n Total Dead: $tot_dead\n Tot Tx: $tot_tx\n Tot Ramp: $tot_ramp"
+        puts "TOTAL ACCOUNTED for = [expr $tot_recv + $tot_crc + $tot_ccr + $tot_dead + $tot_ramp + $tot_tx]"
         set success 0
     }
 

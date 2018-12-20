@@ -6,7 +6,7 @@ source tooltip.tcl
 
 
 proc setup_gui {} {
-    global gui_progress . param node_select myFont FONT_SIZE relay traffic_generator texts
+    global gui_progress . param node_select myFont FONT_SIZE relay traffic_generator texts VERSION
     set gui_progress 0
     set node_list {}
     set node_select             "(0,0)"
@@ -26,7 +26,7 @@ proc setup_gui {} {
 
     # set result variables
     set res(n_packets) 0
-    wm title . "BLE-Mesh Simulator v0.3"
+    wm title . "BLE-Mesh Simulator v$VERSION"
 
     # Menubar
     menu .mbar
@@ -48,22 +48,21 @@ proc setup_gui {} {
 
    label .mode_label -font myFont -text "Simulation Mode"
     ttk::combobox .mode_entry -font myFont -font myFont -textvariable  param(mode)\
-                            -state readonly\
                             -values {"one-to-all" "all-to-one"}\
-                            -state readonly
+                            -state disabled
     trace add variable param(mode) write update_mode
     tooltip::tooltip .mode_label $texts(hovertips_mode_label)
 
 
     label .node_env_label -font myFont -text "Node Environment" -justify left
     ttk::combobox .node_env_entry -font myFont -textvariable  param(node_env)\
-                                -values {"Free-space"}\
+                                -values {"Free-Space" "Office" }\
                                 -state readonly
     tooltip::tooltip .node_env_label $texts(hovertips_node_env_label)
 
     label .show_nam_label -font myFont -text "Show graphic visualization" -justify left
     ttk::combobox .show_nam_entry -font myFont -textvariable  param(show_nam)\
-                                    -state readonly\
+                                    -state disabled\
                                     -values {"Yes" "No"}
     tooltip::tooltip .show_nam_label $texts(hovertips_show_nam_label)
 
@@ -106,16 +105,18 @@ proc setup_gui {} {
     label .node_type_label -font myFont -text "Node IC" -justify left
     ttk::combobox .node_type_entry -font myFont -textvariable  param(node_type)\
                                     -state readonly\
-                                    -values {"nRF52"}
-    tooltip::tooltip .node_type_label $texts(hovertips_node_type_label)                                
+                                    -values {"nRF52840" "nRF52832" "nRF52810"}
+    tooltip::tooltip .node_type_label $texts(hovertips_node_type_label)
+    trace add variable param(node_type) write update_node_type                                
 
     label .tx_power_label -font myFont -text "TX power" -justify left
     ttk::combobox .tx_power_entry -font myFont -textvariable  param(TX_power)\
                                     -state readonly\
-                                    -values {"-4dBm" "0dBm" "+4dBm"}
+                                    -values {"-20dBm" "-16dBm" "-12dBm" "-8dBm" "-4dBm" "0dBm" "+2dBm" "+3dBm" "+4dBm"}
+                        
     tooltip::tooltip .tx_power_label $texts(hovertips_tx_power_label)
 
-    label .bw_label -font myFont -text "Bandwidth" -justify left
+    label .bw_label -font myFont -text "Bitrate" -justify left
     ttk::combobox .bw_entry -font myFont -textvariable  param(bandwidth)\
                             -state readonly\
                             -values {125kb 250kb 1Mb 2Mb}
@@ -129,10 +130,22 @@ proc setup_gui {} {
     entry .node_cache_size_entry -font myFont -textvariable  param(node_cache_size)
     tooltip::tooltip .node_cache_size_label $texts(hovertips_node_cache_size_label)
 
+    label .originator_queue_size_label -font myFont -text "Originator queue size \[n packets\]" -justify left
+    entry .originator_queue_size_entry -font myFont -textvariable  param(originator_queue_size)
+    #tooltip::tooltip .node_cache_size_label $texts(hovertips_node_cache_size_label)
+
+    label .relay_queue_size_label -font myFont -text "Relay queue size \[n packets\]" -justify left
+    entry .relay_queue_size_entry -font myFont -textvariable  param(relay_queue_size)
+    tooltip::tooltip .node_cache_size_label $texts(hovertips_node_cache_size_label)
+    
 
     label .rx_dead_time_label -font myFont -text "Radio Dead-time after receive \[us\]" -justify left
     entry .rx_dead_time_entry -font myFont -textvariable  param(dead_time_us) -justify left
     tooltip::tooltip .rx_dead_time_label $texts(hovertips_rx_dead_time_label)
+
+    label .ramp_time_label -font myFont -text "Radio Ramp-Up-time\[us\]" -justify left
+    entry .ramp_time_entry -font myFont -textvariable  param(ramp_time_us) -justify left
+    #tooltip::tooltip .ramp_time_label $texts(hovertips_rx_dead_time_label)
 
     label .clock_drift_label -font myFont -text "Clock Drift \[ppm\]"
     entry .clock_drift_entry -font myFont -textvariable  param(clock_drift) -state readonly
@@ -140,7 +153,7 @@ proc setup_gui {} {
 
 
     label .adv_roles_label -font myFont -text "Advertisement Roles"
-    entry .adv_roles_entry -font myFont -textvariable  param(adv_roles)
+    entry .adv_roles_entry -font myFont -textvariable  param(adv_roles) -state readonly
     tooltip::tooltip .adv_roles_label $texts(hovertips_adv_roles_label)
 
     label .retransmissions_label -font myFont -text "Retransmissions"
@@ -261,6 +274,23 @@ proc update_mode {name1 nam2 op} {
     }
 }
 
+proc update_node_type {name1 name2 op} {
+    # Update available TX power modes based on which IC we choose.
+    global param .tx_power_entry .bw_entry
+
+    if {$param(node_type) eq "nRF52832"} {
+        .tx_power_entry configure -values {"-20dBm" "-16dBm" "-12dBm" "-8dBm" "-4dBm" "0dBm" "+4dBm"}
+        .bw_entry configure -values {1Mb 2Mb}
+    } elseif {$param(node_type) eq "nRF52840"} {
+        .tx_power_entry configure -values {"-20dBm" "-16dBm" "-12dBm" "-8dBm" "-4dBm" "0dBm" "+4dBm" "+8dBm"}        
+        .bw_entry configure -values {125kb 500kb 1Mb 2Mb}
+    } elseif {$param(node_type) eq "nRF52810"} {
+        .tx_power_entry configure -values {"-20dBm" "-16dBm" "-12dBm" "-8dBm" "-4dBm" "0dBm" "+4dBm"}
+        .bw_entry configure -values {1Mb 2Mb}
+    }
+    
+}
+
 proc open_about_window {} {
     global VERSION
     toplevel .a
@@ -376,8 +406,17 @@ proc run_gui {} {
     grid .node_cache_size_label -row [incr i] -column 0
     grid .node_cache_size_entry -row $i        -column 1
 
+    grid .originator_queue_size_label -row [incr i] -column 0
+    grid .originator_queue_size_entry -row $i        -column 1
+
+    grid .relay_queue_size_label -row [incr i] -column 0
+    grid .relay_queue_size_entry -row $i        -column 1
+    
     grid .rx_dead_time_label -row [incr i] -column 0
     grid .rx_dead_time_entry -row $i -column 1
+
+    grid .ramp_time_label -row [incr i] -column 0
+    grid .ramp_time_entry -row $i -column 1
 
     grid .adv_roles_label -row [incr i] -column 0
     grid .adv_roles_entry -row $i -column 1
@@ -428,6 +467,8 @@ proc disable_gui {} {
     .tx_power_entry configure -state disabled
     .bw_entry configure -state disabled
     .node_cache_size_entry configure -state disabled
+    .originator_queue_size_entry configure -state disabled
+    .relay_queue_size_entry configure -state disabled
     .ttl_entry configure -state disabled
     .clock_drift_entry configure -state disabled
     .node_select_entry configure -state disabled
@@ -436,6 +477,7 @@ proc disable_gui {} {
     .packet_size_entry configure -state disabled
     .traffic_interval_entry configure -state disabled
     .rx_dead_time_entry configure -state disabled
+    .ramp_time_entry configure -state disabled
     .traffic_generator_button configure -state disabled
     .allow_rx_postpone_entry configure -state disabled
     .retransmissions_entry configure -state disabled
@@ -479,7 +521,7 @@ proc display_results {res} {
 
     toplevel .f
     wm title .f "Simulation Results"
-    tk::listbox .f.text -font myFont -yscrollcommand ".f.scroll set" -height 40 -width 100
+    tk::listbox .f.text -font myFont -yscrollcommand ".f.scroll set" -height 50 -width 100
     #Make a scrollbar
     scrollbar .f.scroll -command ".f.text yview" -orient vertical 
 
@@ -502,9 +544,11 @@ proc display_results {res} {
         .f.text insert end "## Gateway ##"
         .f.text insert end "Packets received = [lindex $node_res 1]/[expr $param(n_packets)*($param(num_nodes_x)*$param(num_nodes_y)-1)]"
         .f.text insert end "Throughput =  [expr [lindex $node_res 1]*$param(packet_payload_size)*8/($param(tot_time)*1000)] kbps\n"
-        .f.text insert end "Duplicates received = [lindex $node_res 2]"
-        .f.text insert end "CRC-Collision = [lindex $node_res 6] Co-Channel-Rejections = [lindex $node_res 7] Dead-Time-Collisions: [lindex $node_res 8]"
-       
+        .f.text insert end  "Duplicates received = [lindex $node_res 2]"
+        .f.text insert end  "CRC-Collision = [lindex $node_res 7] Co-Channel-Rejections = [lindex $node_res 8] Dead-Time-Collisions: [lindex $node_res 9]"
+        .f.text insert end  "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]" 
+        .f.text insert end "Packets relayed = [lindex $node_res 5]"
+
        # Extract results for all other nodes
         for {set i 0} {$i < $param(num_nodes_y)} {incr i} {
             for {set j 0} {$j < $param(num_nodes_x)} {incr j} {
@@ -514,10 +558,13 @@ proc display_results {res} {
                     .f.text insert end "### Node_($j-$i) ###"
                     .f.text insert end  "Packets successfully received at Gateway = [lindex $node_res 0]/$param(n_packets)"
                     .f.text insert end  "Throughput = [expr [lindex $node_res 0]*$param(packet_payload_size)*8/($param(tot_time)*1000)] kbps"
-                    .f.text insert end  "Packet queue length at the end of simulation =  [lindex $node_res 3]"
-                    .f.text insert end  "Relayed packets = [lindex $node_res 4] Cache-misses = [lindex $node_res 5]"
+                    .f.text insert end  "Originator Queue Overflows =  [lindex $node_res 3]"
+                    .f.text insert end  "Relay Queue Overflows =  [lindex $node_res 4]"
+                    .f.text insert end  "Packets Received = [lindex $node_res 1]"
+                    .f.text insert end  "Relayed packets = [lindex $node_res 5] Cache-misses = [lindex $node_res 6]"
                     .f.text insert end  "Duplicates received = [lindex $node_res 2]"
-                    .f.text insert end  "CRC-Collision = [lindex $node_res 6] Co-Channel-Rejections = [lindex $node_res 7] Dead-Time-Collisions: [lindex $node_res 8]"    
+                    .f.text insert end  "CRC-Collision = [lindex $node_res 7] Co-Channel-Rejections = [lindex $node_res 8] Dead-Time-Collisions: [lindex $node_res 9]"
+                    .f.text insert end  "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]"    
                 }
                 
             }
@@ -538,21 +585,24 @@ proc display_results {res} {
                     .f.text insert end "### Node_($j-$i) ###"
                     .f.text insert end  "Packets successfully received from Master = [lindex $node_res 1]/$param(n_packets)"
                     .f.text insert end  "Throughput from master = [expr [lindex $node_res 1]*$param(packet_payload_size)*8/($param(tot_time)*1000)] kbps"
-                    .f.text insert end  "Packet queue length at the end of simulation =  [lindex $node_res 3]"
-                    .f.text insert end  "Relayed packets = [lindex $node_res 4] Cache-misses = [lindex $node_res 5]"
+                    .f.text insert end  "Originator Queue Overflows =  [lindex $node_res 3]"
+                    .f.text insert end  "Relay Queue Overflows =  [lindex $node_res 4]"
+                    .f.text insert end  "Relayed packets = [lindex $node_res 5] Cache-misses = [lindex $node_res 6]"
                     .f.text insert end  "Duplicates received = [lindex $node_res 2]"
-                    .f.text insert end  "CRC-Collision = [lindex $node_res 5] Co-Channel-Rejections = [lindex $node_res 6] Dead-Time-Collisions: [lindex $node_res 7]"    
+                    .f.text insert end  "CRC-Collision = [lindex $node_res 7] Co-Channel-Rejections = [lindex $node_res 8] Dead-Time-Collisions: [lindex $node_res 9]"
+                    .f.text insert end  "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]"   
                 }
                 
             }
         }
-        set node_res [lindex $res $param(master_index)]
+        set node_res [lindex $res $master_index]
         .f.text insert $gateway_index "## Gateway ##"
         .f.text insert [incr gateway_index] "Packets received = $total_packets_recv_from_master/[expr $param(n_packets)*($param(num_nodes_x)*$param(num_nodes_y)-1)]"
         .f.text insert [incr gateway_index] "Throughput =  [expr $total_packets_recv_from_master*$param(packet_payload_size)*8/($param(tot_time)*1000)] kbps\n"
         .f.text insert [incr gateway_index] "Duplicates received = [lindex $node_res 2]"
-        .f.text insert [incr gateway_index] "CRC-Collision = [lindex $node_res 5] Co-Channel-Rejections = [lindex $node_res 6] Dead-Time-Collisions: [lindex $node_res 7]"
-        
+        .f.text insert [incr gateway_index] "CRC-Collision = [lindex $node_res 7] Co-Channel-Rejections = [lindex $node_res 8] Dead-Time-Collisions: [lindex $node_res 9]"
+        .f.text insert [incr gateway_index] "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]"    
+
     }
 
     # Pack the textbox
@@ -577,10 +627,13 @@ proc save_results {textbox} {
     $textbox insert [incr i] "Max Jitter \[ms\] = $param(jitterMax_ms)"
     $textbox insert [incr i] "Node IC = $param(node_type)"
     $textbox insert [incr i] "TX Power = $param(TX_power)"
-    $textbox insert [incr i] "Bandwidth = $param(bandwidth)"
+    $textbox insert [incr i] "Bitrate = $param(bandwidth)"
     $textbox insert [incr i] "TTL = $param(ttl)"
     $textbox insert [incr i] "Cache-Size \[n packets\] = $param(node_cache_size)"
+    $textbox insert [incr i] "Originator queue size \[n packets\] = $param(originator_queue_size)"
+    $textbox insert [incr i] "Relay queue size \[n packets\] = $param(relay_queue_size)"
     $textbox insert [incr i] "Radio deadtime after RX \[us\]= $param(dead_time_us)"
+    $textbox insert [incr i] "Radio Ramp Up Time \[us\] = $param(ramp_time_us)"
     $textbox insert [incr i] "Retransmissions = $param(retransmissions)"
     $textbox insert [incr i] "Advertisement roles = $param(adv_roles)"
     $textbox insert [incr i] "Priority = $param(priority)"

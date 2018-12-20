@@ -834,12 +834,42 @@ Agent/BleMeshAdv set packetSize_ 46
 Agent/BleMeshAdv set jitterMax_us_ 10000
 Agent/BleMeshAdv set packets_received_ 0
 Agent/BleMeshAdv set ttl_ 9
-Agent/BleMeshAdv set clockDrift_ppm_ 0
+#Agent/BleMeshAdv set clockDrift_ppm_ 0
 Agent/BleMeshAdv set cache_size_ 100
 Agent/BleMeshAdv set node_id_ -1
 Agent/BleMeshAdv set relay_ 1
 
 Mac/SimpleMesh set jitter_max_us_ 10000
+Mac/SimpleMesh set adv_interval_us_ 40000
+Mac/SimpleMesh set retransmissions_ 1
+Mac/SimpleMesh set adv_roles_		1
+Mac/SimpleMesh set dead_time_us_	0
+Mac/SimpleMesh set bandwidth_		1000000
+
+Mac/BTLEmesh set jitter_max_us_ 10000
+Mac/BTLEmesh set adv_interval_us_ 40000
+Mac/BTLEmesh set adv_roles_ 1
+Mac/BTLEmesh set originator_queue_max_size_ 25
+Mac/BTLEmesh set relay_queue_max_size_ 10
+Mac/BTLEmesh set ack_queue_max_size_ 10
+
+
+Phy/WirelessPhyBTLE set CPThresh_ 10.0
+Phy/WirelessPhyBTLE set CSThresh_ 1.559e-11
+Phy/WirelessPhyBTLE set RXThresh_ 3.652e-10
+Phy/WirelessPhyBTLE set bandwidth_ 1e6
+Phy/WirelessPhyBTLE set Pt_ 1.0
+Phy/WirelessPhyBTLE set freq_ 2402e+6
+Phy/WirelessPhyBTLE set L_ 1.0 
+#Phy/WirelessPhyBTLE set scanInterval_ 40.0 
+#Phy/WirelessPhyBTLE set scanWindow_ 30.0
+#Phy/WirelessPhyBTLE set channelSwitchDelay_ 10.0 ;#microsec
+Phy/WirelessPhyBTLE set rampDelay_ 130.0 ;#us
+Phy/WirelessPhyBTLE set RXDeadtime_ 150.0 ;#us
+Phy/WirelessPhyBTLE set TXDeadtime_ 150.0      
+
+
+
 
 Agent/UDP set packetSize_ 1000
 Agent/UDP instproc done {} { }

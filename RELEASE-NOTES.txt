@@ -1,0 +1,20 @@
+Version 0.4 has the following updates
+
+# Added Parameters
+- Originator Queue max size as input parameter
+- Relay Queue Max size as input parameter
+- Added nRF52840, nRF52832, nRF52810 as options for IC
+- Updated to correct options for TX Power and Bitrate depending on IC
+- Ramp up time [us] (Time to switch between RX and TX mode)
+
+# Removed Parameters
+- Removed Advertisement Roles as input parameter as it was not modelled according to the BLE Mesh spec
+
+
+# Changes in the model
+ReceiverSensitivity is now in accordance with the Product Spec on the different IC.
+Added a PowerMonitor in the PHY layer to record the background noise
+New Phy layer = WirelessPhyBTLE
+New Mac layer = Mac/BTLEmesh
+The new layers gives a better encapsulation and more correctly models the BLE Mesh stack. 
+

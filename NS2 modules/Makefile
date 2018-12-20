@@ -53,13 +53,13 @@ PERL	= /usr/bin/perl
 # for diffusion
 #DIFF_INCLUDES = "./diffusion3/main ./diffusion3/lib ./diffusion3/nr ./diffusion3/ns"
 
-CCOPT	= -O2 -Wall -Wno-write-strings 
+CCOPT	= -g -Wall -Wno-write-strings -Wno-parentheses -Werror
 STATIC	= 
 #LDFLAGS	= $(STATIC)
 LDFLAGS	=  -Wl,-export-dynamic 
-LDOUT	= -o $(BLANK)
+LDOUT	= -o $(BLANK) 
 
-DEFINE	= -DTCP_DELAY_BIND_ALL -DNO_TK -DTCLCL_CLASSINSTVAR  -DNDEBUG -DLINUX_TCP_HEADER -DUSE_SHM -DHAVE_LIBTCLCL -DHAVE_TCLCL_H -DHAVE_LIBOTCL1_14 -DHAVE_OTCL_H -DHAVE_LIBTK8_5 -DHAVE_TK_H -DHAVE_LIBTCL8_5 -DHAVE_TCLINT_H -DHAVE_TCL_H  -DHAVE_CONFIG_H -DNS_DIFFUSION -DSMAC_NO_SYNC -DCPP_NAMESPACE=std -DUSE_SINGLE_ADDRESS_SPACE -Drng_test
+DEFINE	= -DTCP_DELAY_BIND_ALL -DNO_TK -DTCLCL_CLASSINSTVAR  -fsigned-char -fno-inline -DLINUX_TCP_HEADER -DUSE_SHM -DHAVE_LIBTCLCL -DHAVE_TCLCL_H -DHAVE_LIBOTCL1_14 -DHAVE_OTCL_H -DHAVE_LIBTK8_5 -DHAVE_TK_H -DHAVE_LIBTCL8_5 -DHAVE_TCLINT_H -DHAVE_TCL_H  -DHAVE_CONFIG_H -DNS_DIFFUSION -DSMAC_NO_SYNC -DCPP_NAMESPACE=std -DUSE_SINGLE_ADDRESS_SPACE -Drng_test
 
 INCLUDES = \
 	-I.  \
@@ -82,7 +82,7 @@ LIB	= \
 	-lm -lm 
 #	-L${exec_prefix}/lib \
 
-CFLAGS	+= $(CCOPT) $(DEFINE) 
+CFLAGS	+= $(CCOPT) $(DEFINE) -w
 
 # Explicitly define compilation rules since SunOS 4's make doesn't like gcc.
 # Also, gcc does not remove the .o before forking 'as', which can be a
@@ -161,7 +161,7 @@ NS_TCL_LIB_STL = tcl/lib/ns-diffusion.tcl \
 # WIN32: uncomment the following line to include specific make for VC++
 # !include <conf/makefile.win>
 
-OBJ_CC =tools/random.o tools/rng.o tools/ranvar.o common/misc.o common/timer-handler.o \
+OBJ_CC = tools/random.o tools/rng.o tools/ranvar.o common/misc.o common/timer-handler.o \
 	common/scheduler.o common/object.o common/packet.o \
 	common/ip.o routing/route.o common/connector.o common/ttl.o \
 	trace/trace.o trace/trace-ip.o \
@@ -260,6 +260,10 @@ OBJ_CC =tools/random.o tools/rng.o tools/ranvar.o common/misc.o common/timer-han
 	mac/wireless-phyExt.o \
 	mac/mac-timers.o trace/cmu-trace.o mac/varp.o \
 	mac/mac-simple.o \
+	mac/mac-simple-mesh.o \
+	mobile/agent-ble-mesh-adv.o \
+	mac/wireless-phy-btle.o\
+        mac/mac-btle-mesh.o \
 	satellite/sat-hdlc.o \
 	dsdv/dsdv.o dsdv/rtable.o queue/rtqueue.o \
 	routing/rttable.o \
@@ -332,8 +336,6 @@ OBJ_CC =tools/random.o tools/rng.o tools/ranvar.o common/misc.o common/timer-han
 	wpan/p802_15_4sscs.o wpan/p802_15_4timer.o \
 	wpan/p802_15_4trace.o wpan/p802_15_4transac.o \
 	apps/pbc.o \
-	mac/mac-simple-mesh.o \
-	mobile/agent-ble-mesh-adv.o \
 	$(OBJ_STL)
 
 

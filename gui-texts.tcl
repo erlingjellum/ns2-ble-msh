@@ -14,7 +14,7 @@ set texts(hovertips_packet_size_label) "What is the BLE payload of the packets. 
 set texts(hovertips_jitter_max_label)  "What is the maximum random jitter added to each advertisment interval"
 set texts(hovertips_node_type_label) "Which IC is in the node"
 set texts(hovertips_tx_power_label) "What is the transmitting power of the node"
-set texts(hovertips_bw_label) "Pick the bandwidth for the node (BLE = 1Mb)"
+set texts(hovertips_bw_label) "Pick the bitrate for the node (BLE = 1Mb)"
 set texts(hovertips_ttl_label) "Time-To-Live for each packet"
 set texts(hovertips_node_cache_size_label) "The size of the cache in each node storing the last received packets to avoid relaying duplicates"
 set texts(hovertips_rx_dead_time_label) "The radio dead time after a packet receive"
