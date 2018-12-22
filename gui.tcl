@@ -16,10 +16,10 @@ proc setup_gui {} {
 
 
     # Initialize the node_list (just for GUI)
-    for {set i 0} {$i < $param(num_nodes_y)} {incr i} {   
+    for {set i 0} {$i < $param(num_nodes_y)} {incr i} {
         for {set j 0} {$j < $param(num_nodes_x)} {incr j} {
             set index [expr $i*$param(num_nodes_x) + $j]
-            lappend node_list "($j, $i)"  
+            lappend node_list "($j, $i)"
         }
     }
 
@@ -107,13 +107,12 @@ proc setup_gui {} {
                                     -state readonly\
                                     -values {"nRF52840" "nRF52832" "nRF52810"}
     tooltip::tooltip .node_type_label $texts(hovertips_node_type_label)
-    trace add variable param(node_type) write update_node_type                                
+    trace add variable param(node_type) write update_node_type
 
     label .tx_power_label -font myFont -text "TX power" -justify left
     ttk::combobox .tx_power_entry -font myFont -textvariable  param(TX_power)\
                                     -state readonly\
-                                    -values {"-20dBm" "-16dBm" "-12dBm" "-8dBm" "-4dBm" "0dBm" "+2dBm" "+3dBm" "+4dBm"}
-                        
+
     tooltip::tooltip .tx_power_label $texts(hovertips_tx_power_label)
 
     label .bw_label -font myFont -text "Bitrate" -justify left
@@ -125,7 +124,7 @@ proc setup_gui {} {
     label .ttl_label -font myFont -text "TTL \[\]"
     entry .ttl_entry -font myFont -textvariable  param(ttl)
     tooltip::tooltip .ttl_label $texts(hovertips_ttl_label)
-    
+
     label .node_cache_size_label -font myFont -text "Cache size \[n packets\]" -justify left
     entry .node_cache_size_entry -font myFont -textvariable  param(node_cache_size)
     tooltip::tooltip .node_cache_size_label $texts(hovertips_node_cache_size_label)
@@ -137,7 +136,7 @@ proc setup_gui {} {
     label .relay_queue_size_label -font myFont -text "Relay queue size \[n packets\]" -justify left
     entry .relay_queue_size_entry -font myFont -textvariable  param(relay_queue_size)
     tooltip::tooltip .node_cache_size_label $texts(hovertips_node_cache_size_label)
-    
+
 
     label .rx_dead_time_label -font myFont -text "Radio Dead-time after receive \[us\]" -justify left
     entry .rx_dead_time_entry -font myFont -textvariable  param(dead_time_us) -justify left
@@ -189,7 +188,7 @@ proc setup_gui {} {
     trace add variable relay write update_node_relay
     tooltip::tooltip .node_relay_label $texts(hovertips_node_relay_label)
 
-    button .start_button -font myFont -text "Start" -command "run_simulation" 
+    button .start_button -font myFont -text "Start" -command "run_simulation"
 
 }
 
@@ -207,12 +206,12 @@ proc update_node_list {name1 name2 op} {
             lappend node_list "($i, $j)"
             if {$index != $param(master_index)} {
                 lappend param(node_relay) 1
-                lappend param(traffic_generator) 1    
+                lappend param(traffic_generator) 1
             } else {
                 lappend param(node_relay) 0
                 lappend param(traffic_generator) 0
             }
-            
+
         }
 
     .node_select_entry configure -textvariable node_select\
@@ -259,7 +258,7 @@ proc update_mode {name1 nam2 op} {
                 lappend param(traffic_generator) 0
             }
         }
-        
+
 
     } elseif {$param(mode) eq "all-to-one"} {
         .traffic_generator_button configure -state normal
@@ -270,7 +269,7 @@ proc update_mode {name1 nam2 op} {
                 lappend param(traffic_generator) 1
             }
         }
-        
+
     }
 }
 
@@ -282,20 +281,20 @@ proc update_node_type {name1 name2 op} {
         .tx_power_entry configure -values {"-20dBm" "-16dBm" "-12dBm" "-8dBm" "-4dBm" "0dBm" "+4dBm"}
         .bw_entry configure -values {1Mb 2Mb}
     } elseif {$param(node_type) eq "nRF52840"} {
-        .tx_power_entry configure -values {"-20dBm" "-16dBm" "-12dBm" "-8dBm" "-4dBm" "0dBm" "+4dBm" "+8dBm"}        
+        .tx_power_entry configure -values {"-20dBm" "-16dBm" "-12dBm" "-8dBm" "-4dBm" "0dBm" "+4dBm" "+8dBm"}
         .bw_entry configure -values {125kb 500kb 1Mb 2Mb}
     } elseif {$param(node_type) eq "nRF52810"} {
         .tx_power_entry configure -values {"-20dBm" "-16dBm" "-12dBm" "-8dBm" "-4dBm" "0dBm" "+4dBm"}
         .bw_entry configure -values {1Mb 2Mb}
     }
-    
+
 }
 
 proc open_about_window {} {
     global VERSION
     toplevel .a
     wm title .a "About"
-    label .a.text -font myFont -text "BLE Mesh Simulator\nVersion $VERSION\nCopyright 2018 Nordic Semiconductor ASA\nSimulates a grid of BLE nodes running the BLE Mesh protocol with NS2" 
+    label .a.text -font myFont -text "BLE Mesh Simulator\nVersion $VERSION\nCopyright 2018 Nordic Semiconductor ASA\nSimulates a grid of BLE nodes running the BLE Mesh protocol with NS2"
 
     grid .a.text
 }
@@ -338,9 +337,11 @@ proc update_master {} {
 
 proc run_gui {} {
     global .
-    update_node_options 1 2 3 
+    # First need to run two of the "update" functions to get the correct values in the drop-down menus
+    update_node_options 1 2 3
+    update_node_type 1 2 3
 
-    # Configure the layout of the GUI 
+    # Configure the layout of the GUI
     ######################################
 
     set i 0
@@ -411,7 +412,7 @@ proc run_gui {} {
 
     grid .relay_queue_size_label -row [incr i] -column 0
     grid .relay_queue_size_entry -row $i        -column 1
-    
+
     grid .rx_dead_time_label -row [incr i] -column 0
     grid .rx_dead_time_entry -row $i -column 1
 
@@ -422,7 +423,7 @@ proc run_gui {} {
     grid .adv_roles_entry -row $i -column 1
 
     grid .retransmissions_label -row [incr i] -column 0
-    grid .retransmissions_entry -row $i -column 1    
+    grid .retransmissions_entry -row $i -column 1
 
     grid .priority_label -row [incr i] -column 0
     grid .priority_entry -row $i -column 1
@@ -454,14 +455,14 @@ proc run_gui {} {
 
 proc disable_gui {} {
     global .
-    .mode_entry configure -state disabled  
+    .mode_entry configure -state disabled
     .show_nam_entry configure -state disabled
     .node_env_entry configure -state disabled
     .node_type_entry configure -state disabled
-    .num_nodes_x_entry configure -state disabled 
+    .num_nodes_x_entry configure -state disabled
     .num_nodes_y_entry configure -state disabled
-    .spacing_entry configure -state disabled    
-    .n_packets_entry configure -state disabled 
+    .spacing_entry configure -state disabled
+    .n_packets_entry configure -state disabled
     .txp_entry configure -state disabled
     .jitter_max_entry configure -state disabled
     .tx_power_entry configure -state disabled
@@ -483,7 +484,7 @@ proc disable_gui {} {
     .retransmissions_entry configure -state disabled
     .adv_roles_entry configure -state disabled
     .priority_entry configure -state disabled
-}    
+}
 
 proc update_progressbar {} {
     global gui_progress
@@ -506,7 +507,7 @@ proc run_simulation {} {
     .start_button configure -text "New Simulation" -font myFont
 
     display_results $results
-    
+
 }
 
 proc restart {} {
@@ -523,7 +524,7 @@ proc display_results {res} {
     wm title .f "Simulation Results"
     tk::listbox .f.text -font myFont -yscrollcommand ".f.scroll set" -height 50 -width 100
     #Make a scrollbar
-    scrollbar .f.scroll -command ".f.text yview" -orient vertical 
+    scrollbar .f.scroll -command ".f.text yview" -orient vertical
 
     #Make a menu
     menu .f.mbar
@@ -546,7 +547,7 @@ proc display_results {res} {
         .f.text insert end "Throughput =  [expr [lindex $node_res 1]*$param(packet_payload_size)*8/($param(tot_time)*1000)] kbps\n"
         .f.text insert end  "Duplicates received = [lindex $node_res 2]"
         .f.text insert end  "CRC-Collision = [lindex $node_res 7] Co-Channel-Rejections = [lindex $node_res 8] Dead-Time-Collisions: [lindex $node_res 9]"
-        .f.text insert end  "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]" 
+        .f.text insert end  "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]"
         .f.text insert end "Packets relayed = [lindex $node_res 5]"
 
        # Extract results for all other nodes
@@ -564,15 +565,15 @@ proc display_results {res} {
                     .f.text insert end  "Relayed packets = [lindex $node_res 5] Cache-misses = [lindex $node_res 6]"
                     .f.text insert end  "Duplicates received = [lindex $node_res 2]"
                     .f.text insert end  "CRC-Collision = [lindex $node_res 7] Co-Channel-Rejections = [lindex $node_res 8] Dead-Time-Collisions: [lindex $node_res 9]"
-                    .f.text insert end  "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]"    
+                    .f.text insert end  "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]"
                 }
-                
+
             }
         }
-        
+
     } elseif {$param(mode) eq "one-to-all"} {
         # Extract results for the Gateway
-        
+
         set gateway_index [.f.text index end]
         set total_packets_recv_from_master 0
         # Extract results for all other nodes
@@ -590,9 +591,9 @@ proc display_results {res} {
                     .f.text insert end  "Relayed packets = [lindex $node_res 5] Cache-misses = [lindex $node_res 6]"
                     .f.text insert end  "Duplicates received = [lindex $node_res 2]"
                     .f.text insert end  "CRC-Collision = [lindex $node_res 7] Co-Channel-Rejections = [lindex $node_res 8] Dead-Time-Collisions: [lindex $node_res 9]"
-                    .f.text insert end  "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]"   
+                    .f.text insert end  "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]"
                 }
-                
+
             }
         }
         set node_res [lindex $res $master_index]
@@ -601,7 +602,7 @@ proc display_results {res} {
         .f.text insert [incr gateway_index] "Throughput =  [expr $total_packets_recv_from_master*$param(packet_payload_size)*8/($param(tot_time)*1000)] kbps\n"
         .f.text insert [incr gateway_index] "Duplicates received = [lindex $node_res 2]"
         .f.text insert [incr gateway_index] "CRC-Collision = [lindex $node_res 7] Co-Channel-Rejections = [lindex $node_res 8] Dead-Time-Collisions: [lindex $node_res 9]"
-        .f.text insert [incr gateway_index] "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]"    
+        .f.text insert [incr gateway_index] "Collision while TXing = [lindex $node_res 10] Collision while ramp-up/ramp-down = [lindex $node_res 11]"
 
     }
 
