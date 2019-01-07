@@ -167,14 +167,14 @@ proc setup_gui {} {
     entry .allow_rx_postpone_entry -font myFont -textvariable  param(allow_rx_postpone) -state readonly
     tooltip::tooltip .allow_rx_postpone_label $texts(hovertips_allow_rx_postpone_label)
 
-    label .node_select_label -font myFont -text "Node" -justify left
+    label .node_select_label -font myFont -text "Node Select" -justify left
     ttk::combobox .node_select_entry -font myFont -textvariable  node_select\
                                     -values $node_list\
                                     -state readonly
     trace add variable node_select write update_node_options
     tooltip::tooltip .node_select_label $texts(hovertips_node_select_label)
 
-    label .node_master_label -font myFont -text "Master" -justify left
+    label .node_master_label -font myFont -text "Gateway" -justify left
     checkbutton .node_master_button -command update_master
     tooltip::tooltip .node_master_label $texts(hovertips_node_master_label)
 
