@@ -6,9 +6,6 @@ Version 0.4
 ## Quick start
 Open up the folder ns2-ble-msh on the desktop and press SIMULATOR.sh to start the simulator
 
-
-
-
 ## Explanation of input parameters
 Simulation Mode: Choose the scenario you want to simulate. All-to-one: Gateway receiving packets from all nodes. One-to-all: Master advertising packets to all nodes in Network
 Node Environment: Set the environment the nodes will be in. This will decide the radio propegation model
@@ -70,11 +67,14 @@ It keeps a statistic, which is printed in the Result page, of failed receptions.
 col_dead = packets dropped because radio was dead
 col_tx = packets dropped because radio was tx-ing
 col_crc = packets failed because of collision and bit flips (this number includes the packets received with bitflips AND the packets that caused the bitflips)
+(In case of a collision, if the SNR is greater than 20dBm there is no bitflips (and crc error). If the SNR is less than 20dBm
+there will be bitflips and a CRC error on the packet.) 
 col_ccr = Co-channel rejections. Packets dropped because of other, stronger, packets being received or a strong background noise
 col_ramp = packets dropped because radio was ramping between TX and RX.
 
 If a higher layer hands a packet to the PHY, it will stop whatever it is doing (even packet reception), and ramp up to TX and send that packet.
 PHY only supports single channel transmission and reception.
+
 
 
 Mac/BTLEmesh (MAC).
